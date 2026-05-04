@@ -8,27 +8,27 @@ cd
 git clone --recursive https://github.com/ANCL/fy690s_ws.git
 ```
 
-### [Install ROS2 Jazzy](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
-
-Optional: Add source command to .bashrc
+### Install ROS2 Jazzy
+Follow the instructions [here](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html).
+Then add the source command to .bashrc:
 ```
-echo "source /opt/ros/<distro>/setup.bash" >> ~/.bashrc
+echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
 source ~/.bashrc
 ```
 
 ### [Install QGC](https://docs.qgroundcontrol.com/Stable_V5.0/en/qgc-user-guide/getting_started/download_and_install.html#ubuntu)
 
 
-### [Setup PX4](https://docs.px4.io/main/en/ros2/user_guide#install-px4)
+### Setup PX4
 ```
 bash ~/fy690s_ws/px4/PX4-Autopilot/Tools/setup/ubuntu.sh 
-cd px4/PX4-Autopilot/
+cd ~/fy690s_ws/px4/PX4-Autopilot/
 make px4_sitl
 ```
 
-### [Setup Micro XRCE-DDS Agent & Client](https://docs.px4.io/main/en/ros2/user_guide#setup-micro-xrce-dds-agent-client)
-
+### Setup Micro XRCE-DDS Agent & Client
 ```
+chmod +x ~/fy690s_ws/scripts/install_src_uxrce_agent.sh
 ~/fy690s_ws/scripts/install_src_uxrce_agent.sh
 ```
 
