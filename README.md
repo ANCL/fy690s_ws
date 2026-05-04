@@ -16,7 +16,8 @@ echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### [Install QGC](https://docs.qgroundcontrol.com/Stable_V5.0/en/qgc-user-guide/getting_started/download_and_install.html#ubuntu)
+### Install QGC
+Follow the instructions [here](https://docs.qgroundcontrol.com/Stable_V5.0/en/qgc-user-guide/getting_started/download_and_install.html#ubuntu).
 After installation, click the QGC icon at the top-left corner -> Application Settings -> Fly view -> toggle "enable virtual joystick".
 
 ### Setup PX4
