@@ -1,9 +1,11 @@
 [submodule "px4/PX4-Autopilot"]
 	path = px4/PX4-Autopilot
-	url = git@github.com:ANCL/PX4-Autopilot.git
+	url = https://github.com/ANCL/PX4-Autopilot.git
+
 [submodule "ros2_ws/src/px4_msgs"]
 	path = ros2_ws/src/px4_msgs
-	url = git@github.com:ANCL/px4_msgs.git
+	url = https://github.com/ANCL/px4_msgs.git
+
 [submodule "ros2_ws/src/px4_ros_com"]
 	path = ros2_ws/src/px4_ros_com
-	url = git@github.com:ANCL/px4_ros_com.git
+	url = https://github.com/ANCL/px4_ros_com.git
