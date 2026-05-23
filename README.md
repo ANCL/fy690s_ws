@@ -18,7 +18,7 @@ source ~/.bashrc
 
 ### Install QGC
 Follow the instructions [here](https://docs.qgroundcontrol.com/Stable_V5.0/en/qgc-user-guide/getting_started/download_and_install.html#ubuntu).
-After installation, click the QGC icon at the top-left corner -> Application Settings -> Fly view -> toggle "enable virtual joystick".
+After installation, move the QGC App image to home directory (~). Run QGC, and click the QGC icon at the top-left corner -> Application Settings -> Fly view -> toggle "enable virtual joystick".
 
 ### Setup PX4
 ```
