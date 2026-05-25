@@ -7,3 +7,6 @@
 [submodule "ros2_ws/src/px4_ros_com"]
 	path = ros2_ws/src/px4_ros_com
 	url = git@github.com:ANCL/px4_ros_com.git
+[submodule "ros2_ws/src/ros2-vicon-receiver"]
+	path = ros2_ws/src/ros2-vicon-receiver
+	url = https://github.com/ANCL/ros2-vicon-receiver.git
