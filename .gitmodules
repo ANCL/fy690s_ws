@@ -12,4 +12,4 @@
 
 [submodule "ros2_ws/src/vicon_bridge/vicon_receiver"]
 	path = ros2_ws/src/vicon_bridge/vicon_receiver
-	url = https://github.com/OPT4SMART/ros2-vicon-receiver.git
+	url = https://github.com/ANCL/ros2-vicon-receiver.git
