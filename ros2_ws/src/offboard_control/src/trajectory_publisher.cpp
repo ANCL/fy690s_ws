@@ -45,9 +45,9 @@ public:
                 }
         });
 
-        // add a timer to run at 50Hz (20ms)
+        // add a timer to run at 100Hz (10ms)
         start_time_ = this->now();
-        timer_ = this->create_wall_timer(20ms, std::bind(&TrajectoryPublisher::timer_callback, this));
+        timer_ = this->create_wall_timer(10ms, std::bind(&TrajectoryPublisher::timer_callback, this));
     }
 private:
     // internal struct for math
@@ -130,17 +130,19 @@ private:
     }
 
     TrajectoryReference compute_circle_reference(double t_sec) const {
-        const double R = 2.0;
+        const double R = 1.0;
         const double omega = 0.4;
+        const double x_offset = 0.3;
         const double z_ref = -1.2;
         
-        const double x = R * std::cos(omega * t_sec);
-        const double y = R * std::sin(omega * t_sec);
+        const double cos_wt = std::cos(omega * t_sec);
+        const double sin_wt = std::sin(omega * t_sec);
         
         TrajectoryReference ref{};
-        ref.position = Eigen::Vector3d(x, y, z_ref);
-        ref.velocity = Eigen::Vector3d((omega * (-y)), (omega * x), 0.0);
-        ref.acceleration = Eigen::Vector3d((omega * omega * (-x)), (omega * omega * (-y)), 0.0);
+        ref.position = Eigen::Vector3d(x_offset + R * cos_wt, R * sin_wt, z_ref);
+        
+        ref.velocity = Eigen::Vector3d(-R * omega * sin_wt, R * omega * cos_wt, 0.0);
+        ref.acceleration = Eigen::Vector3d(-R * omega * omega * cos_wt, -R * omega * omega * sin_wt, 0.0);
         ref.yaw = 0.0f;
         
         return ref;
@@ -180,14 +182,14 @@ private:
         ref.acceleration = Eigen::Vector3d(NAN, NAN , NAN);
         ref.yaw = 0.0f;
 
-        // wrap the time to a 20-second repeating period
-        double t_mod = std::fmod(t_sec, 20.0);
+        // wrap the time to a 80-second repeating period
+        double t_mod = std::fmod(t_sec, 80.0);
 
-        if (t_mod < 5.0) {
+        if (t_mod < 20.0) {
             ref.position = Eigen::Vector3d(1.0, 0.0, z);
-        } else if (t_mod < 10.0) {
+        } else if (t_mod < 40.0) {
             ref.position = Eigen::Vector3d(0.0, 1.0, z);
-        } else if (t_mod < 15.0) {
+        } else if (t_mod < 60.0) {
             ref.position = Eigen::Vector3d(-1.0, 0.0, z);
         } else {
             ref.position = Eigen::Vector3d(0.0, -1.0, z);

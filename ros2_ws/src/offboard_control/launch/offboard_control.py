@@ -12,7 +12,7 @@ def generate_launch_description():
     control_mode_arg = DeclareLaunchArgument(
         "control_mode",
         default_value="position",
-        description="Choose 'position' or 'acceleration'"
+        description="Choose 'position', 'full', 'acceleration'"
     )
     
     flight_path_arg = DeclareLaunchArgument(
