@@ -140,7 +140,6 @@ private:
         
         TrajectoryReference ref{};
         ref.position = Eigen::Vector3d(x_offset + R * cos_wt, R * sin_wt, z_ref);
-        
         ref.velocity = Eigen::Vector3d(-R * omega * sin_wt, R * omega * cos_wt, 0.0);
         ref.acceleration = Eigen::Vector3d(-R * omega * omega * cos_wt, -R * omega * omega * sin_wt, 0.0);
         ref.yaw = 0.0f;
@@ -202,8 +201,8 @@ private:
         TrajectoryReference ref{};
         
         ref.position = Eigen::Vector3d(x, y, z);
-        ref.velocity = Eigen::Vector3d(NAN, NAN, NAN);
-        ref.acceleration = Eigen::Vector3d(NAN, NAN, NAN);
+        ref.velocity = Eigen::Vector3d(0.0, 0.0, 0.0);
+        ref.acceleration = Eigen::Vector3d(0.0, 0.0, 0.0);
         ref.yaw = 0.0f;
 
         return ref;
