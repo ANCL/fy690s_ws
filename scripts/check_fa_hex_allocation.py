@@ -21,6 +21,8 @@ def build_allocation_matrix(L, alpha, km_values, theta0=0.0, tilt_direction="out
     for i in range(6):
         theta = theta0 + i * np.pi / 3.0
 
+        alpha_i = alpha if i % 2 == 0 else -alpha # Alternate rotor angle sign
+
         r_i = np.array([
             L * np.cos(theta),
             L * np.sin(theta),
@@ -82,7 +84,7 @@ if __name__ == "__main__":
 
     # Example alternating spin directions.
     # Adjust signs according to your real rotor order.
-    km = np.array([0.0136, -0.0136, 0.0136, -0.0136, 0.0136, 0.0136])
+    km = np.array([0.0136, -0.0136, 0.0136, -0.0136, 0.0136, -0.0136])
 
     B = build_allocation_matrix(
         L=L,

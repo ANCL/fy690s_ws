@@ -1,7 +1,7 @@
 import math
 import sys
 
-def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6010_fa_hex_tilt"):
+def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6010_fy690s_tilt"):
     """
     Generates a PX4 airframe configuration file with modified PX, PY, AX, AY, AZ.
     
@@ -26,7 +26,7 @@ def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6010_fa_
 
 PX4_SIMULATOR=${PX4_SIMULATOR:=gz}
 PX4_GZ_WORLD=${PX4_GZ_WORLD:=default}
-PX4_SIM_MODEL=${PX4_SIM_MODEL:=fa_hex_tilt}
+PX4_SIM_MODEL=${PX4_SIM_MODEL:=fy690s_tilt}
 
 param set-default CA_ROTOR_COUNT 6
 """
@@ -112,6 +112,5 @@ if __name__ == "__main__":
     test_gammas = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     
     # Example of an alternating inward/outward canted setup:
-    # test_alphas = [15.0, -15.0, 15.0, -15.0, 15.0, -15.0]
     
     generate_airframe_file(test_alphas, test_betas, test_gammas)
