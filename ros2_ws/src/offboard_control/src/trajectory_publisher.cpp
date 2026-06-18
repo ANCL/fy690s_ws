@@ -4,52 +4,50 @@
  * @author Dion Walton <ddwalton@ualberta.ca>
  */
 
-#include <rclcpp/rclcpp.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_status.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <vector>
-#include <algorithm>
 
 using namespace px4_msgs::msg;
 using namespace std::chrono_literals;
 
 class TrajectoryPublisher : public rclcpp::Node {
 
-public:
+  public:
     TrajectoryPublisher() : Node("trajectory_publisher") {
         publisher_ = this->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/custom/trajectory_reference", 10);
-        
+
         // declare parameter
         flight_path_ = this->declare_parameter<std::string>("flight_path", "hover");
-        
-        param_callback_handle_ = this->add_on_set_parameters_callback(
-            std::bind(&TrajectoryPublisher::parameters_callback, this, std::placeholders::_1));
+
+        param_callback_handle_ = this->add_on_set_parameters_callback(std::bind(&TrajectoryPublisher::parameters_callback, this, std::placeholders::_1));
 
         // subscribe to vehicle status to detect when Offboard mode is triggered via RC
-        vehicle_status_sub_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
-            "/fmu/out/vehicle_status_v1", rclcpp::SensorDataQoS(),
-            [this](const px4_msgs::msg::VehicleStatus::SharedPtr msg) {
-                bool was_offboard = is_offboard_;
-                is_offboard_ = (msg->nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD);
-                
-                // if we just switched into offboard mode, reset the trajectory clock to 0
-                if (is_offboard_ && !was_offboard) {
-                    RCLCPP_INFO(this->get_logger(), "Offboard mode engaged, trajectory clock started!");
-                    start_time_ = this->now();
-                }
+        vehicle_status_sub_ = this->create_subscription<px4_msgs::msg::VehicleStatus>("/fmu/out/vehicle_status_v1", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleStatus::SharedPtr msg) {
+            bool was_offboard = is_offboard_;
+            is_offboard_ = (msg->nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD);
+
+            // if we just switched into offboard mode, reset the trajectory clock to 0
+            if (is_offboard_ && !was_offboard) {
+                RCLCPP_INFO(this->get_logger(), "Offboard mode engaged, trajectory clock started!");
+                start_time_ = this->now();
+            }
         });
 
         // add a timer to run at 100Hz (10ms)
         start_time_ = this->now();
         timer_ = this->create_wall_timer(10ms, std::bind(&TrajectoryPublisher::timer_callback, this));
     }
-private:
+
+  private:
     // internal struct for math
     struct TrajectoryReference {
         Eigen::Vector3d position;
@@ -79,7 +77,7 @@ private:
     void timer_callback() {
         double t_sec = (this->now() - start_time_).seconds();
         TrajectoryReference ref;
-        
+
         if (flight_path_ == "figure8") {
             ref = compute_figure8_reference(t_sec);
         } else if (flight_path_ == "circle") {
@@ -95,16 +93,14 @@ private:
         } else {
             // Default to hover and throttle the warning
             ref = compute_step_reference(0.0, 0.0, -1.2);
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                "Fallback to hover -- '%s' does not exist. Options: hover, step, figure8, circle, helix, mission", 
-                flight_path_.c_str());
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Fallback to hover -- '%s' does not exist. Options: hover, step, figure8, circle, helix, mission", flight_path_.c_str());
         }
 
         // map the struct data to the ROS message
         px4_msgs::msg::TrajectorySetpoint msg{};
-        msg.position = { (float)ref.position.x(), (float)ref.position.y(), (float)ref.position.z() };
-        msg.velocity = { (float)ref.velocity.x(), (float)ref.velocity.y(), (float)ref.velocity.z() };
-        msg.acceleration = { (float)ref.acceleration.x(), (float)ref.acceleration.y(), (float)ref.acceleration.z() };
+        msg.position = {(float)ref.position.x(), (float)ref.position.y(), (float)ref.position.z()};
+        msg.velocity = {(float)ref.velocity.x(), (float)ref.velocity.y(), (float)ref.velocity.z()};
+        msg.acceleration = {(float)ref.acceleration.x(), (float)ref.acceleration.y(), (float)ref.acceleration.z()};
         msg.yaw = ref.yaw;
         msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 
@@ -116,16 +112,16 @@ private:
         const double B = 1.0;
         const double omega = 0.4;
         const double z_ref = -1.2;
-        
+
         const double s = std::sin(omega * t_sec);
         const double c = std::cos(omega * t_sec);
-        
+
         TrajectoryReference ref{};
         ref.position = Eigen::Vector3d(A * s, B * s * c, z_ref);
         ref.velocity = Eigen::Vector3d(A * omega * c, B * omega * (c * c - s * s), 0.0);
         ref.acceleration = Eigen::Vector3d(-A * omega * omega * s, -4.0 * B * omega * omega * s * c, 0.0);
         ref.yaw = 0.0f;
-        
+
         return ref;
     }
 
@@ -134,16 +130,16 @@ private:
         const double omega = 0.4;
         const double x_offset = 0.3;
         const double z_ref = -1.2;
-        
+
         const double cos_wt = std::cos(omega * t_sec);
         const double sin_wt = std::sin(omega * t_sec);
-        
+
         TrajectoryReference ref{};
         ref.position = Eigen::Vector3d(x_offset + R * cos_wt, R * sin_wt, z_ref);
         ref.velocity = Eigen::Vector3d(-R * omega * sin_wt, R * omega * cos_wt, 0.0);
         ref.acceleration = Eigen::Vector3d(-R * omega * omega * cos_wt, -R * omega * omega * sin_wt, 0.0);
         ref.yaw = 0.0f;
-        
+
         return ref;
     }
 
@@ -163,13 +159,13 @@ private:
             z = max_z;
             z_vel = 0.0;
         }
-        
+
         TrajectoryReference ref{};
         ref.position = Eigen::Vector3d(x, y, z);
         ref.velocity = Eigen::Vector3d((omega * (-y)), (omega * x), z_vel);
         ref.acceleration = Eigen::Vector3d((omega * omega * (-x)), (omega * omega * (-y)), 0.0);
         ref.yaw = 0.0f;
-        
+
         return ref;
     }
 
@@ -178,7 +174,7 @@ private:
         const double z = -1.2;
 
         ref.velocity = Eigen::Vector3d(NAN, NAN, NAN);
-        ref.acceleration = Eigen::Vector3d(NAN, NAN , NAN);
+        ref.acceleration = Eigen::Vector3d(NAN, NAN, NAN);
         ref.yaw = 0.0f;
 
         // wrap the time to a 80-second repeating period
@@ -199,7 +195,7 @@ private:
 
     TrajectoryReference compute_step_reference(const double x, const double y, const double z) {
         TrajectoryReference ref{};
-        
+
         ref.position = Eigen::Vector3d(x, y, z);
         ref.velocity = Eigen::Vector3d(0.0, 0.0, 0.0);
         ref.acceleration = Eigen::Vector3d(0.0, 0.0, 0.0);
@@ -211,17 +207,15 @@ private:
     rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr publisher_;
     rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
     std::string flight_path_;
-    
+
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Time start_time_;
-    
+
     rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_sub_;
     bool is_offboard_{false};
-
-    
 };
 
-int main(int argc, char * argv[]) {
+int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
     rclcpp::spin(std::make_shared<TrajectoryPublisher>());
     rclcpp::shutdown();
