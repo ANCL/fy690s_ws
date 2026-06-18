@@ -49,7 +49,7 @@ public:
         hover_thrust_ = this->declare_parameter<double>("hover_thrust", hover_thrust_);
         yaw_ = this->declare_parameter<double>("yaw_", 0.0);
         attitude_tau_ = this->declare_parameter<double>("attitude_tau_", 0.3);
-        norm_thrust_const_ = this->declare_parameter<double>("norm_thrust_const_", 0.05055);
+        norm_thrust_const_ = this->declare_parameter<double>("norm_thrust_const_", 0.075); // 0.05055
         norm_thrust_offset_ = this->declare_parameter<double>("norm_thrust_offset_", 0.0);
         ref_rate_limit_ = this->declare_parameter<double>("ref_rate_limit_", 1);
 
@@ -134,6 +134,7 @@ public:
                 latest_attitude_(1) = q_enu.x();
                 latest_attitude_(2) = q_enu.y();
                 latest_attitude_(3) = q_enu.z();
+                attitude_received_ = true;
             });
     }
 
@@ -170,6 +171,7 @@ private:
     double hover_thrust_;
 
     // Attitude and Rate Mode Specific Parameters
+    bool attitude_received_{false};
     double yaw_, ref_rate_limit_;
     double attitude_tau_; // Attitude time constant for body rate control
     double norm_thrust_const_, norm_thrust_offset_;
@@ -208,6 +210,11 @@ rcl_interfaces::msg::SetParametersResult OffboardControl::parameters_callback(
         else if (param.get_name() == "Kv") { kv_ = param.as_double(); K_v_ = kv_ * Eigen::Matrix3d::Identity(); }
         else if (param.get_name() == "mass") mass_ = param.as_double();
         else if (param.get_name() == "hover_thrust") hover_thrust_ = param.as_double();
+        else if (param.get_name() == "yaw_") yaw_ = param.as_double();
+        else if (param.get_name() == "attitude_tau_") attitude_tau_ = param.as_double();
+        else if (param.get_name() == "norm_thrust_const_") norm_thrust_const_ = param.as_double();
+        else if (param.get_name() == "norm_thrust_offset_") norm_thrust_offset_ = param.as_double();
+        else if (param.get_name() == "ref_rate_limit_") ref_rate_limit_ = param.as_double();
     }
     return result;
 }
@@ -250,17 +257,24 @@ void OffboardControl::publish_trajectory_setpoint()
     // Convert NED acceleration to ENU (X_enu = Y_ned, Y_enu = X_ned, Z_enu = -Z_ned)
     Eigen::Vector3d a_cmd_enu(a_cmd.y(), a_cmd.x(), -a_cmd.z());
 
-    // Convert NED yaw to ENU yaw (pi/2 offset and inverted direction)
-    double yaw_enu = M_PI_2 - yaw_; 
+    if (attitude_received_) {
+        // Convert NED yaw to ENU yaw (pi/2 offset and inverted direction)
+        double yaw_enu = M_PI_2 - yaw_; 
 
-    // Add Gravity Compensation in ENU (Gravity pulls -Z, so thrust must push +Z)
-    Eigen::Vector3d thrust_vector_enu = a_cmd_enu + Eigen::Vector3d(0.0, 0.0, 9.81);    // Compute desired attitude quaternion setpoints
+        // Add Gravity Compensation in ENU (Gravity pulls -Z, so thrust must push +Z)
+        Eigen::Vector3d thrust_vector_enu = a_cmd_enu + Eigen::Vector3d(0.0, 0.0, 9.81);    // Compute desired attitude quaternion setpoints
 
-    const auto q_cmd = acceleration_to_quaternion(thrust_vector_enu, yaw_enu);
+        // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+        //     "[Accel Debug] pos_z: %.3f | a_cmd.z(NED): %.3f | a_cmd_enu.z: %.3f | thrust_vec_enu.z: %.3f",
+        //     p.z(), a_cmd.z(), a_cmd_enu.z(), thrust_vector_enu.z());
 
-    // Compute desired body rate and thrust setpoints
-    // First 3 indices are rates, last index is normalized thrust
-    const auto rate_thrust_cmd = attitude_to_body_rate_and_thrust(latest_attitude_, q_cmd, thrust_vector_enu);
+        const auto q_cmd = acceleration_to_quaternion(thrust_vector_enu, yaw_enu);
+
+        // Compute desired body rate and thrust setpoints
+        // First 3 indices are rates, last index is normalized thrust
+        const auto rate_thrust_cmd = attitude_to_body_rate_and_thrust(latest_attitude_, q_cmd, thrust_vector_enu);
+    }
+
     
     uint64_t timestamp = this->get_clock()->now().nanoseconds() / 1000;
 
@@ -455,7 +469,9 @@ std::pair<Eigen::Vector3d, double> OffboardControl::attitude_to_body_rate_and_th
     // Use the calibrated thrust-motor curve to compute the final normalized thrust command
     const auto normalized_thrust = std::max(0.0, std::min(1.0, norm_thrust_const_ * desired_thrust + norm_thrust_offset_));
 
-    RCLCPP_INFO(this->get_logger(), "desired_thrust: %f, normalized_thrust: %f", desired_thrust, normalized_thrust);
+    // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+    //     "[Thrust Debug] ref_acc(Z): %.3f | zb(Z): %.3f | desired_thrust: %.3f | norm_thrust: %.3f | hover_param: %.3f",
+    //     ref_acc(2), zb(2), desired_thrust, normalized_thrust, hover_thrust_);
     return {desired_rate, normalized_thrust};
 }
 
