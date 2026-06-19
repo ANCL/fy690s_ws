@@ -152,6 +152,7 @@ class OffboardControl : public rclcpp::Node {
     Eigen::Matrix3d K_v_;
     double mass_;
     double hover_thrust_;
+    const double gravity_ = 9.8066;
 
     // Attitude and Rate Mode Specific Parameters
     bool attitude_received_{false};
@@ -169,6 +170,7 @@ class OffboardControl : public rclcpp::Node {
     Eigen::Vector3d compute_acceleration_command(const Eigen::Vector3d &p, const Eigen::Vector3d &v, const Eigen::Vector3d &p_d, const Eigen::Vector3d &v_d, const Eigen::Vector3d &a_d);
 
     // Attitude and Rate Mode Specific Methods
+    Eigen::Vector3d applyQSFIntegralCtrl(const Eigen::Vector3d &p_ref);
     std::pair<Eigen::Vector3d, double> attitude_to_body_rate_and_thrust(const Eigen::Vector4d &curr_att, const Eigen::Vector4d &ref_att, const Eigen::Vector3d &ref_acc);
     Eigen::Vector4d acceleration_to_quaternion(const Eigen::Vector3d &vector_acc, const double &yaw);
     void publish_attitude_setpoints(const double &thrust_cmd, const Eigen::Vector4d &target_attitude);
@@ -235,38 +237,40 @@ void OffboardControl::publish_trajectory_setpoint() {
         return;
     }
 
+    Eigen::Vector3d a_cmd;
     const Eigen::Vector3d p(latest_local_pos_.x, latest_local_pos_.y, latest_local_pos_.z);
     const Eigen::Vector3d v(latest_local_pos_.vx, latest_local_pos_.vy, latest_local_pos_.vz);
-
     Eigen::Vector3d p_ref(latest_ref_.position[0], latest_ref_.position[1], latest_ref_.position[2]);
     Eigen::Vector3d v_ref(latest_ref_.velocity[0], latest_ref_.velocity[1], latest_ref_.velocity[2]);
     Eigen::Vector3d a_ref(latest_ref_.acceleration[0], latest_ref_.acceleration[1], latest_ref_.acceleration[2]);
+    if (pid_control_) {
+        a_cmd = compute_acceleration_command(p, v, p_ref, v_ref, a_ref);
+    } else {
+        a_cmd = applyQSFIntegralCtrl(p_ref);
+    }
 
-    const Eigen::Vector3d a_cmd = compute_acceleration_command(p, v, p_ref, v_ref, a_ref);
-
-    // Convert NED acceleration to ENU (X_enu = Y_ned, Y_enu = X_ned, Z_enu =
-    // -Z_ned)
-    Eigen::Vector3d a_cmd_enu(a_cmd.y(), a_cmd.x(), -a_cmd.z());
-
+    Eigen::Vector4d q_cmd;
+    std::pair<Eigen::Vector3d, double> rate_thrust_cmd;
     if (attitude_received_) {
+        // Convert NED acceleration to ENU (X_enu = Y_ned, Y_enu = X_ned, Z_enu = -Z_ned)
+        Eigen::Vector3d a_cmd_enu(a_cmd.y(), a_cmd.x(), -a_cmd.z());
+
         // Convert NED yaw to ENU yaw (pi/2 offset and inverted direction)
         double yaw_enu = M_PI_2 - yaw_;
 
-        // Add Gravity Compensation in ENU (Gravity pulls -Z, so thrust must
-        // push +Z)
-        Eigen::Vector3d thrust_vector_enu = a_cmd_enu + Eigen::Vector3d(0.0, 0.0,
-                                                                        9.81); // Compute desired attitude quaternion setpoints
+        // Add Gravity Compensation in ENU (Gravity pulls -Z, so thrust must push +Z)
+        Eigen::Vector3d thrust_vector_enu = a_cmd_enu + Eigen::Vector3d(0.0, 0.0, gravity_); // Compute desired attitude quaternion setpoints
 
         // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
         //     "[Accel Debug] pos_z: %.3f | a_cmd.z(NED): %.3f | a_cmd_enu.z:
         //     %.3f | thrust_vec_enu.z: %.3f", p.z(), a_cmd.z(), a_cmd_enu.z(),
         //     thrust_vector_enu.z());
 
-        const auto q_cmd = acceleration_to_quaternion(thrust_vector_enu, yaw_enu);
+        q_cmd = acceleration_to_quaternion(thrust_vector_enu, yaw_enu);
 
         // Compute desired body rate and thrust setpoints
         // First 3 indices are rates, last index is normalized thrust
-        const auto rate_thrust_cmd = attitude_to_body_rate_and_thrust(latest_attitude_, q_cmd, thrust_vector_enu);
+        rate_thrust_cmd = attitude_to_body_rate_and_thrust(latest_attitude_, q_cmd, thrust_vector_enu);
     } else {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "No attitude measurements received yet");
     }
@@ -310,13 +314,11 @@ void OffboardControl::publish_trajectory_setpoint() {
         debug_msg.velocity = {NAN, NAN, NAN};
         debug_msg.acceleration = {NAN, NAN, NAN};
         debug_trajectory_setpoint_publisher_->publish(debug_msg);
-    } else if (control_mode_ == "attitude") {
+    } else if (control_mode_ == "attitude" && attitude_received_) {
         publish_attitude_setpoints(rate_thrust_cmd.second, q_cmd);
-    } else if (control_mode_ == "rate") {
+    } else if (control_mode_ == "rate" && attitude_received_) {
         publish_rate_setpoints(rate_thrust_cmd.first, rate_thrust_cmd.second);
-    }
-
-    else {
+    } else {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Unknown control_mode '%s', falling back to position mode", control_mode_.c_str());
         msg.position = {static_cast<float>(p_ref.x()), static_cast<float>(p_ref.y()), static_cast<float>(p_ref.z())};
         msg.velocity = {NAN, NAN, NAN};
@@ -349,12 +351,11 @@ void OffboardControl::publish_se3_attitude_setpoint() {
 
     // calculate desired force (NED Frame)
     // gravity acts in +z
-    const double g = 9.81;
-    Eigen::Vector3d F_d = -K_p_ * e_p - K_v_ * e_v + mass_ * a_ref + Eigen::Vector3d(0.0, 0.0, -mass_ * g);
+    Eigen::Vector3d F_d = -K_p_ * e_p - K_v_ * e_v + mass_ * a_ref + Eigen::Vector3d(0.0, 0.0, -mass_ * gravity_);
 
     // map to normalized thrust
     double thrust_mag = F_d.norm();
-    double norm_thrust = (thrust_mag / (mass_ * g)) * hover_thrust_;
+    double norm_thrust = (thrust_mag / (mass_ * gravity_)) * hover_thrust_;
     norm_thrust = std::clamp(norm_thrust, 0.0, 1.0);
 
     // calculate desired attitude (rotation matrix)
@@ -399,6 +400,78 @@ Eigen::Vector3d OffboardControl::compute_acceleration_command(const Eigen::Vecto
     const Eigen::Vector3d e_p = p - p_d;
     const Eigen::Vector3d e_v = v - v_d;
     return a_d - K_v_ * e_v - K_p_ * e_p; // gravity compensation already accounted for
+}
+
+Eigen::Vector3d OffboardControl::applyQSFIntegralCtrl(const Eigen::Vector3d &p_ref) {
+    const double last_call_time = this->get_clock()->now().seconds() - traj_tracking_last_called_.seconds();
+    double target_force_ned[3];
+    const double K[13] = {Kint_x_, Kpos_x_, Kvel_x_, Kacc_x_, Kjer_x_, Kint_y_, Kpos_y_, Kvel_y_, Kacc_y_, Kjer_y_, Kint_z_, Kpos_z_, Kvel_z_};
+
+    // Update SLS state
+    double sls_state_array[15];
+    for (int i = 0; i < 12; i++) {
+        sls_state_array[i] = sls_state_.sls_state[i];
+    }
+    for (int i = 12; i < 15; i++) {
+        sls_state_array[i] = xi_[i - 12];
+    }
+
+    // Convert NED references to ENU
+    double ref_x[5], ref_y[5], ref_z[5];
+    for (int i = 0; i < 5; i++) {
+        ref_x[i] = ref_y_[i];
+        ref_y[i] = ref_x_[i];
+        ref_z[i] = -ref_z_[i];
+    }
+
+    // add integral, modified from nardos's QSFGeometricController
+    double xi_dot[3];
+    const double Mt = mass_ + load_mass_;
+    const double param[5] = {mass_, load_mass_, Mt, cable_length_, gravity_};
+    double ref[15] = {ref_x[0], ref_x[1], ref_x[2], ref_x[3], ref_x[4], ref_y[0], ref_y[1], ref_y[2], ref_y[3], ref_y[4], ref_z[0], ref_z[1], ref_z[2], ref_z[3], ref_z[4]};
+    QSFGeometricIntController(sls_state_array, K, param, ref, target_force_ned, xi_dot);
+
+    double load_pose[3] = {sls_state_array[0], sls_state_array[1], sls_state_array[2]};
+    double load_pose_ref[3] = {ref_x[0], ref_y[0], ref_z[0]};
+
+    // RCLCPP_INFO(this->get_logger(), "integral_limit: %f", integral_limit_);
+    // RCLCPP_INFO(this->get_logger(), "xi0: %f", xi_[0]);
+    // RCLCPP_INFO(this->get_logger(), "xi1: %f", xi_[1]);
+    // RCLCPP_INFO(this->get_logger(), "xi2: %f", xi_[2]);
+    for (int i = 0; i < 3; i++) {
+        // RCLCPP_INFO(this->get_logger(), "err: %f", std::abs(load_pose[i] - load_pose_ref[i]));
+        if (std::abs(xi_[i] + xi_dot[i] * diff_t_) <= integral_limit_) {
+            xi_[i] += xi_dot[i] * diff_t_;
+        }
+    }
+
+    sls_force_.header.stamp = this->get_clock()->now();
+    sls_force_.sls_force[0] = target_force_ned[0];
+    sls_force_.sls_force[1] = target_force_ned[1];
+    sls_force_.sls_force[2] = target_force_ned[2];
+    sls_force_pub_->publish(sls_force_);
+
+    Eigen::Vector3d a_des;
+    a_des(0) = target_force_ned[1] / mass_;
+    a_des(1) = target_force_ned[0] / mass_;
+    a_des(2) = -target_force_ned[2] / mass_;
+
+    Eigen::Vector3d a_fb = a_des + gravity_;
+
+    if (a_fb.norm() > max_fb_acc_)
+        a_fb = (max_fb_acc_ / a_fb.norm()) * a_fb;
+
+    // rotor drag compensation
+    Eigen::Vector3d a_rd;
+    if (drag_comp_enabled_) {
+        a_rd = compensateRotorDrag(last_call_time);
+    } else {
+        a_rd = Eigen::Vector3d::Zero();
+    }
+
+    a_des = a_fb - a_rd - gravity_;
+
+    return a_des;
 }
 
 Eigen::Vector4d OffboardControl::acceleration_to_quaternion(const Eigen::Vector3d &vector_acc, const double &yaw) {
