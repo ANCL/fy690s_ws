@@ -1,9 +1,9 @@
 import math
 import sys
 
-def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6010_fy690s_tilt"):
+def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6010_gz_fy690s_tilt"):
     """
-    Generates a PX4 airframe configuration file with modified PX, PY, AX, AY, AZ.
+    Generates a PX4 airframe configuration file mapping a Gazebo FLU model to PX4 FRD parameters.
     
     :param alphas_deg: List of 6 tilt arm axis angles in degrees.
     :param betas_deg: List of 6 tilt outward axis angles in degrees.
@@ -13,8 +13,8 @@ def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6010_fy6
     
     # Base configuration constants
     base_angles = [30.0, 90.0, 150.0, 210.0, 270.0, 330.0]
-    radius = 0.36  # Calculated from sqrt(0.3118^2 + 0.1800^2)
-    pz_fixed = -0.0440
+    radius = 0.395  
+    pz_fixed = -0.0440 # Already in FRD (Down is positive, so -0.0440 is UP)
     
     # KM Values (CCW == -ve vs CW == +ve)
     km_vals = [0.0136, -0.0136, 0.0136, -0.0136, 0.0136, -0.0136]
@@ -22,13 +22,12 @@ def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6010_fy6
 
     header = """#!/bin/sh
 
-. ${R}etc/init.d/rc.mc_defaults
+. ${R}etc/init.d/rc.fa_defaults
 
 PX4_SIMULATOR=${PX4_SIMULATOR:=gz}
 PX4_GZ_WORLD=${PX4_GZ_WORLD:=default}
 PX4_SIM_MODEL=${PX4_SIM_MODEL:=fy690s_tilt}
 
-param set-default CA_ROTOR_COUNT 6
 """
 
     footer = """
@@ -66,18 +65,27 @@ param set-default SYS_AUTOSTART 6010
             beta = math.radians(betas_deg[i])
             gamma = math.radians(gammas_deg[i])
             
-            #  Calculate New Position based on Gamma
+            # Calculate arm angle in FLU frame
             phi_deg = base_angles[i] + gammas_deg[i]
             phi_rad = math.radians(phi_deg)
             
-            px = radius * math.cos(phi_rad)
-            py = -radius * math.sin(phi_rad)  # Y is negative for positive angles in this frame
+            # --- GAZEBO FLU (Forward-Left-Up) CALCULATIONS ---
+            # Position
+            x_flu = radius * math.cos(phi_rad)
+            y_flu = radius * math.sin(phi_rad)
             
-            #  Calculate Thrust Vectors (AX, AY, AZ) using the rotation matrix
-            # A_W = R_z(phi) * R_y(beta) * R_x(alpha) * [0, 0, -1]^T
-            ax = -math.cos(phi_rad) * math.sin(beta) * math.cos(alpha) + math.sin(phi_rad) * math.sin(alpha)
-            ay = math.sin(phi_rad) * math.sin(beta) * math.cos(alpha) + math.cos(phi_rad) * math.sin(alpha)
-            az = -math.cos(beta) * math.cos(alpha)
+            # Thrust Vector (Derived from Euler Z-Y-X intrinsic rotations applied to UP vector [0,0,1]^T)
+            v_flu_x = -math.cos(phi_rad) * math.sin(beta) * math.cos(alpha) - math.sin(phi_rad) * math.sin(alpha)
+            v_flu_y = -math.sin(phi_rad) * math.sin(beta) * math.cos(alpha) + math.cos(phi_rad) * math.sin(alpha)
+            v_flu_z = math.cos(alpha) * math.cos(beta)
+
+            # --- PX4 FRD (Forward-Right-Down) MAPPING ---
+            px = x_flu
+            py = -y_flu
+            
+            ax = v_flu_x
+            ay = -v_flu_y
+            az = -v_flu_z
 
             # Prevent floating point noise (e.g. 1.22e-16 to 0.0)
             px = 0.0 if abs(px) < 1e-5 else px
@@ -103,14 +111,9 @@ param set-default SYS_AUTOSTART 6010
     print(f"Airframe configuration saved to '{filename}'.")
 
 if __name__ == "__main__":
-    # Example Usage:
-    # Set alternating alphas (e.g., inwards/outwards) or fixed betas
-    # If everything is set to 0.0, it will perfectly recreate your original file.
-    
+    # Test alternating inward/outward alphas
     test_alphas = [25.0, -25.0, 25.0, -25.0, 25.0, -25.0]
     test_betas  = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     test_gammas = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    
-    # Example of an alternating inward/outward canted setup:
     
     generate_airframe_file(test_alphas, test_betas, test_gammas)
