@@ -19,7 +19,7 @@ def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6010_gz_
     # KM Values (CCW == +ve vs CW == -ve)
     km_vals = [0.0185, -0.0185, 0.0185, -0.0185, 0.0185, -0.0185]
     directions = ["CCW", "CW", "CCW", "CW", "CCW", "CW"]
-
+    ct_vals = [17.658, 17.658, 17.658, 17.658, 17.658, 17.658]
     header = """#!/bin/sh
 
 . ${R}etc/init.d/rc.fa_defaults
@@ -105,6 +105,7 @@ param set-default SYS_AUTOSTART 6010
             f.write(f"param set-default CA_ROTOR{i}_AY {ay:.4f}\n")
             f.write(f"param set-default CA_ROTOR{i}_AZ {az:.4f}\n")
             f.write(f"param set-default CA_ROTOR{i}_KM {km_vals[i]:.4f}\n")
+            f.write(f"param set-default CA_ROTOR{i}_CT {ct_vals[i]:.4f}\n")
 
         f.write(footer)
     
