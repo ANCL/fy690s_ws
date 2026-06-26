@@ -13,11 +13,11 @@ def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6010_gz_
     
     # Base configuration constants
     base_angles = [30.0, 90.0, 150.0, 210.0, 270.0, 330.0]
-    radius = 0.395  
+    radius = 0.360
     pz_fixed = -0.0440 # Already in FRD (Down is positive, so -0.0440 is UP)
     
-    # KM Values (CCW == -ve vs CW == +ve)
-    km_vals = [0.0136, -0.0136, 0.0136, -0.0136, 0.0136, -0.0136]
+    # KM Values (CCW == +ve vs CW == -ve)
+    km_vals = [0.0185, -0.0185, 0.0185, -0.0185, 0.0185, -0.0185]
     directions = ["CCW", "CW", "CCW", "CW", "CCW", "CW"]
 
     header = """#!/bin/sh
@@ -46,12 +46,12 @@ param set-default SIM_GZ_EC_MIN4 150
 param set-default SIM_GZ_EC_MIN5 150
 param set-default SIM_GZ_EC_MIN6 150
 
-param set-default SIM_GZ_EC_MAX1 1100
-param set-default SIM_GZ_EC_MAX2 1100
-param set-default SIM_GZ_EC_MAX3 1100
-param set-default SIM_GZ_EC_MAX4 1100
-param set-default SIM_GZ_EC_MAX5 1100
-param set-default SIM_GZ_EC_MAX6 1100
+param set-default SIM_GZ_EC_MAX1 822.05
+param set-default SIM_GZ_EC_MAX2 822.05
+param set-default SIM_GZ_EC_MAX3 822.05
+param set-default SIM_GZ_EC_MAX4 822.05
+param set-default SIM_GZ_EC_MAX5 822.05
+param set-default SIM_GZ_EC_MAX6 822.05
 
 param set-default SYS_AUTOSTART 6010
 """
