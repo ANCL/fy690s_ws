@@ -74,13 +74,13 @@ ros2 run px4_ros_com offboard_control
 Connect the Pixhawk to QGC on the dev computer using a USB-C cable. After QGC detects the Pixhawk, follow the instructions [here](https://docs.px4.io/main/en/dev_setup/building_px4#nuttx-pixhawk-based-boards) to flash the firmware. For example, to flash the Pixhawk 6C, do
 ```
 cd ~/fy690s_ws/px4/PX4-Autopilot/
-make px4_fmu-v6_default upload
+make px4_fmu-v6c_default upload
 ```
 Then, back up the current QGC parameters
 ```
 QGroundControl → Vehicle Setup → Parameters → Tools → Save to file
 ```
-Also， record outputs of the following commands by running them in Analyze Tools → MAVLink Console:
+Also, record outputs of the following commands by running them in Analyze Tools → MAVLink Console:
 ```
 param show MAV_*_CONFIG
 param show UXRCE_DDS_CFG
