@@ -32,4 +32,10 @@ install(TARGETS
   offboard_wrench_test
   DESTINATION lib/${PROJECT_NAME}
 )
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
 ament_package()
