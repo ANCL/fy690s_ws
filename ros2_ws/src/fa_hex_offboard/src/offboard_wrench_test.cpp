@@ -1,3 +1,8 @@
+/**
+ * @brief Node that allows you to inject multiple wrench 
+ * @file motor_sweep.cpp
+*/
+
 #include <rclcpp/rclcpp.hpp>
 #include <px4_msgs/msg/offboard_control_mode.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
@@ -28,15 +33,24 @@ public:
         torque_setpoint_pub_ = create_publisher<px4_msgs::msg::VehicleTorqueSetpoint>(
             "/fmu/in/vehicle_torque_setpoint", 10);
 
-        // Parameters
-        declare_parameter<std::string>("test_axis", "tx");
-        declare_parameter<double>("amplitude", 0.1);
+        // Parameters for multi-axis injection
+        declare_parameter<double>("amp_fx", 0.0);
+        declare_parameter<double>("amp_fy", 0.0);
+        declare_parameter<double>("amp_fz", 0.0);
+        declare_parameter<double>("amp_tx", 0.0);
+        declare_parameter<double>("amp_ty", 0.0);
+        declare_parameter<double>("amp_tz", 0.0);
+        
         declare_parameter<double>("hover_thrust", -0.6); // Negative is UP in NED frame
         declare_parameter<bool>("arm", false);
         declare_parameter<bool>("offboard", false);
 
-        get_parameter("test_axis", test_axis_);
-        get_parameter("amplitude", amplitude_);
+        get_parameter("amp_fx", amp_fx_);
+        get_parameter("amp_fy", amp_fy_);
+        get_parameter("amp_fz", amp_fz_);
+        get_parameter("amp_tx", amp_tx_);
+        get_parameter("amp_ty", amp_ty_);
+        get_parameter("amp_tz", amp_tz_);
         get_parameter("hover_thrust", hover_thrust_);
         get_parameter("arm", arm_);
         get_parameter("offboard", offboard_);
@@ -95,27 +109,19 @@ private:
         // This gives the drone time to get into the air and stabilize motor RPMs
         if (counter_ > 500) {
             if (counter_ == 501) {
-                RCLCPP_INFO(get_logger(), "Injecting test wrench on axis: %s", test_axis_.c_str());
+                RCLCPP_INFO(get_logger(), 
+                    "Injecting combined test wrenches: fx=%.2f, fy=%.2f, fz=%.2f, tx=%.2f, ty=%.2f, tz=%.2f",
+                    amp_fx_, amp_fy_, amp_fz_, amp_tx_, amp_ty_, amp_tz_);
             }
 
-            const float a = static_cast<float>(amplitude_);
+            // Apply all configured amplitudes directly to their respective axes
+            thrust_msg.xyz[0] = static_cast<float>(amp_fx_);
+            thrust_msg.xyz[1] = static_cast<float>(amp_fy_);
+            thrust_msg.xyz[2] += static_cast<float>(amp_fz_); // Add to baseline hover thrust
 
-            if (test_axis_ == "fx") {
-                thrust_msg.xyz[0] = a;
-            } else if (test_axis_ == "fy") {
-                thrust_msg.xyz[1] = a;
-            } else if (test_axis_ == "fz") {
-                thrust_msg.xyz[2] += a; // Add to baseline hover thrust
-            } else if (test_axis_ == "tx") {
-                torque_msg.xyz[0] = a;
-            } else if (test_axis_ == "ty") {
-                torque_msg.xyz[1] = a;
-            } else if (test_axis_ == "tz") {
-                torque_msg.xyz[2] = a;
-            } else {
-                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-                    "Unknown test_axis. Use fx, fy, fz, tx, ty, or tz.");
-            }
+            torque_msg.xyz[0] = static_cast<float>(amp_tx_);
+            torque_msg.xyz[1] = static_cast<float>(amp_ty_);
+            torque_msg.xyz[2] = static_cast<float>(amp_tz_);
         }
 
         thrust_setpoint_pub_->publish(thrust_msg);
@@ -150,8 +156,13 @@ private:
     rclcpp::Publisher<px4_msgs::msg::VehicleTorqueSetpoint>::SharedPtr torque_setpoint_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
-    std::string test_axis_{"tx"};
-    double amplitude_{0.1};
+    double amp_fx_{0.0};
+    double amp_fy_{0.0};
+    double amp_fz_{0.0};
+    double amp_tx_{0.0};
+    double amp_ty_{0.0};
+    double amp_tz_{0.0};
+    
     double hover_thrust_{-0.6};
     bool arm_{false};
     bool offboard_{false};
