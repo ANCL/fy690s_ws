@@ -1,6 +1,6 @@
 /**
  * @brief Node that allows you to inject multiple wrench 
- * @file motor_sweep.cpp
+ * @file offboard_wrench_test.cpp
 */
 
 #include <rclcpp/rclcpp.hpp>

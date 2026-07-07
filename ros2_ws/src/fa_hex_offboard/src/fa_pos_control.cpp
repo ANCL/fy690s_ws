@@ -14,16 +14,16 @@ FAPositionControlNode::FAPositionControlNode() : Node("fa_pos_control")
         "/fmu/in/vehicle_thrust_setpoint", 10);
     torque_setpoint_pub_ = this->create_publisher<px4_msgs::msg::VehicleTorqueSetpoint>(
         "/fmu/in/vehicle_torque_setpoint", 10);
-    offboard_control_mode_pub_ = this->create_publisher<px4_msgs::msg::OffboardControlMode>( // <-- NEW PUBLISHER INIT
+    offboard_control_mode_pub_ = this->create_publisher<px4_msgs::msg::OffboardControlMode>(
         "/fmu/in/offboard_control_mode", 10);
 
     // Initialize subscribers
     attitude_sub_ = this->create_subscription<px4_msgs::msg::VehicleAttitude>(
-        "/fmu/out/vehicle_attitude", 10, [this](const px4_msgs::msg::VehicleAttitude::SharedPtr msg) { attitude_ = *msg; });
+        "/fmu/out/vehicle_attitude", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleAttitude::SharedPtr msg) { attitude_ = *msg; });
     angular_velocity_sub_ = this->create_subscription<px4_msgs::msg::VehicleAngularVelocity>(
-        "/fmu/out/vehicle_angular_velocity", 10, [this](const px4_msgs::msg::VehicleAngularVelocity::SharedPtr msg) { angular_vel_ = *msg; });
+        "/fmu/out/vehicle_angular_velocity", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleAngularVelocity::SharedPtr msg) { angular_vel_ = *msg; });
     trajectory_setpoint_sub_ = this->create_subscription<px4_msgs::msg::TrajectorySetpoint>(
-        "/fmu/out/trajectory_setpoint", 10, [this](const px4_msgs::msg::TrajectorySetpoint::SharedPtr msg) { trajectory_sp_ = *msg; });
+        "/custom/trajectory_reference", 10, [this](const px4_msgs::msg::TrajectorySetpoint::SharedPtr msg) { trajectory_sp_ = *msg; });
     attitude_setpoint_sub_ = this->create_subscription<px4_msgs::msg::VehicleAttitudeSetpoint>(
         "/fmu/out/vehicle_attitude_setpoint", 10, [this](const px4_msgs::msg::VehicleAttitudeSetpoint::SharedPtr msg) { attitude_sp_ = *msg; });
     rates_setpoint_sub_ = this->create_subscription<px4_msgs::msg::VehicleRatesSetpoint>(
@@ -31,11 +31,11 @@ FAPositionControlNode::FAPositionControlNode() : Node("fa_pos_control")
     hover_thrust_sub_ = this->create_subscription<px4_msgs::msg::HoverThrustEstimate>(
         "/fmu/out/hover_thrust_estimate", 10, [this](const px4_msgs::msg::HoverThrustEstimate::SharedPtr msg) { hover_thrust_estimate_ = *msg; });
     land_detected_sub_ = this->create_subscription<px4_msgs::msg::VehicleLandDetected>(
-        "/fmu/out/vehicle_land_detected", 10, [this](const px4_msgs::msg::VehicleLandDetected::SharedPtr msg) { land_detected_ = *msg; });
+        "/fmu/out/vehicle_land_detected", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleLandDetected::SharedPtr msg) { land_detected_ = *msg; });
 
     // Driving callback
     local_position_sub_ = this->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
-        "/fmu/out/vehicle_local_position", 10, std::bind(&FAPositionControlNode::local_position_callback, this, _1));
+        "/fmu/out/vehicle_local_position", rclcpp::SensorDataQoS(), std::bind(&FAPositionControlNode::local_position_callback, this, _1));
 
     time_stamp_last_loop_ = this->now();
     e_p_int_.setZero();
@@ -44,39 +44,46 @@ FAPositionControlNode::FAPositionControlNode() : Node("fa_pos_control")
 void FAPositionControlNode::declare_and_update_parameters()
 {
     // Mass
-    mass_ = this->declare_parameter<float>("fa_mass", 1.5f);
+    mass_ = this->declare_parameter<float>("fa_mass", 3.70f);
 
     // Gains
-    k_p_ = Eigen::Vector3f(this->declare_parameter<float>("fa_p_x", 1.0f),
-                           this->declare_parameter<float>("fa_p_y", 1.0f),
-                           this->declare_parameter<float>("fa_p_z", 1.0f));
+    k_p_ = Eigen::Vector3f(
+        this->declare_parameter<float>("fa_p_x", 8.0f),
+        this->declare_parameter<float>("fa_p_y", 8.0f),
+        this->declare_parameter<float>("fa_p_z", 4.0f));
 
-    k_v_ = Eigen::Vector3f(this->declare_parameter<float>("fa_v_x", 0.5f),
-                           this->declare_parameter<float>("fa_v_y", 0.5f),
-                           this->declare_parameter<float>("fa_v_z", 0.5f));
+    k_v_ = Eigen::Vector3f(
+        this->declare_parameter<float>("fa_v_x", 8.0f),
+        this->declare_parameter<float>("fa_v_y", 8.0f),
+        this->declare_parameter<float>("fa_v_z", 4.0f));
 
-    k_r_ = Eigen::Vector3f(this->declare_parameter<float>("fa_r_r", 0.1f),
-                           this->declare_parameter<float>("fa_r_p", 0.1f),
-                           this->declare_parameter<float>("fa_r_y", 0.1f));
+    k_r_ = Eigen::Vector3f(
+        this->declare_parameter<float>("fa_r_r", 2.0f),
+        this->declare_parameter<float>("fa_r_p", 2.0f),
+        this->declare_parameter<float>("fa_r_y", 2.0f));
 
-    k_w_ = Eigen::Vector3f(this->declare_parameter<float>("fa_w_r", 0.05f),
-                           this->declare_parameter<float>("fa_w_p", 0.05f),
-                           this->declare_parameter<float>("fa_w_y", 0.05f));
+    k_w_ = Eigen::Vector3f(
+        this->declare_parameter<float>("fa_w_r", 1.0f),
+        this->declare_parameter<float>("fa_w_p", 1.0f),
+        this->declare_parameter<float>("fa_w_y", 1.0f));
 
-    k_i_ = Eigen::Vector3f(this->declare_parameter<float>("fa_i_x", 0.0f),
-                           this->declare_parameter<float>("fa_i_y", 0.0f),
-                           this->declare_parameter<float>("fa_i_z", 0.0f));
+    k_i_ = Eigen::Vector3f(
+        this->declare_parameter<float>("fa_i_x", 1.0f),
+        this->declare_parameter<float>("fa_i_y", 1.0f),
+        this->declare_parameter<float>("fa_i_z", 1.0f));
 
-    int_limit_ = this->declare_parameter<float>("fa_int_lim", 1.0f);
+    int_limit_ = this->declare_parameter<float>("fa_int_lim", 0.0f);
 
     // Maximums
-    thrust_maximums_ = Eigen::Vector3f(this->declare_parameter<float>("fa_thr_max_x", 1.0f),
-                                       this->declare_parameter<float>("fa_thr_max_y", 1.0f),
-                                       this->declare_parameter<float>("fa_thr_max_z", 1.0f));
+    thrust_maximums_ = Eigen::Vector3f(
+        this->declare_parameter<float>("fa_thr_max_x", 61.2f),
+        this->declare_parameter<float>("fa_thr_max_y", 61.2f),
+        this->declare_parameter<float>("fa_thr_max_z", 61.2f));
 
-    torque_maximums_ = Eigen::Vector3f(this->declare_parameter<float>("fa_trq_max_r", 1.0f),
-                                       this->declare_parameter<float>("fa_trq_max_p", 1.0f),
-                                       this->declare_parameter<float>("fa_trq_max_y", 1.0f));
+    torque_maximums_ = Eigen::Vector3f(
+        this->declare_parameter<float>("fa_trq_max_r", 2.0f),
+        this->declare_parameter<float>("fa_trq_max_p", 2.0f),
+        this->declare_parameter<float>("fa_trq_max_y", 2.0f));
 }
 
 void FAPositionControlNode::local_position_callback(const px4_msgs::msg::VehicleLocalPosition::SharedPtr msg)
@@ -163,13 +170,15 @@ void FAPositionControlNode::update_control_law(float dt)
     Eigen::Vector3f F_b = R.transpose() * F_n;
 
     // Normalize thrust and torque
-    Eigen::Vector3f vehicle_thrust_setpoint = project_wrench(F_b, thrust_maximums_);
+    //Eigen::Vector3f vehicle_thrust_setpoint = project_wrench(F_b, thrust_maximums_);
     Eigen::Vector3f tau_b = -k_r_.cwiseProduct(e_R_) - k_w_.cwiseProduct(e_w_);
-    Eigen::Vector3f vehicle_torque_setpoint = project_wrench(tau_b, torque_maximums_);
+   // Eigen::Vector3f vehicle_torque_setpoint = project_wrench(tau_b, torque_maximums_);
 
-    if (!is_airborne && vel_sp.norm() < 0.1f) {
-        vehicle_thrust_setpoint.setZero();
-        vehicle_torque_setpoint.setZero();
+    Eigen::Vector3f vehicle_thrust_setpoint;
+    Eigen::Vector3f vehicle_torque_setpoint;
+    for (int i = 0; i < 3; ++i) {
+        vehicle_thrust_setpoint(i) = F_b(i) / thrust_maximums_(i);
+        vehicle_torque_setpoint(i) = tau_b(i) / torque_maximums_(i);
     }
 
     // Capture standard timestamp
@@ -185,7 +194,7 @@ void FAPositionControlNode::update_control_law(float dt)
     offboard_msg.acceleration = false;
     offboard_msg.attitude = false;
     offboard_msg.body_rate = false;
-    offboard_msg.thrust_and_torque = true; // <-- Telling PX4 we are controlling raw wrench
+    offboard_msg.thrust_and_torque = true;
     offboard_msg.direct_actuator = false;
     offboard_control_mode_pub_->publish(offboard_msg);
 
@@ -248,7 +257,6 @@ Eigen::Vector3f FAPositionControlNode::project_wrench(const Eigen::Vector3f& com
     return normalized_cmd;
 }
 
-// ROS 2 Entry Point
 int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
