@@ -1,20 +1,34 @@
 /**
  * @brief Motor command sweeping node. Applies a normalized thrust command to each rotor individually, tracks RPM, and thrust per motor.
  * @file motor_sweep.cpp
- * @author Dion Walton <ddwalton@ualberta.ca>
- * 
+ * @see https://github.com/gazebosim/ros_gz/tree/jazzy
  */
+
+/*
+NOTE: For Gazebo simulations, this requires running the ros_gz_bridge with the following command for RPM.
+
+ros2 run ros_gz_bridge parameter_bridge /<model_name>/command/motor_speed@actuator_msgs/msg/Actuators[gz.msgs.Actuators
+
+OR run the launch file via 
+
+ros2 launch fa_hex_offboard motor_sweep.launch.py model_name:='<model_name>' thrust_coeff:='<val__from_sdf>'
+
+NOTE: Also you should disable auto disarming via changing COM_DISARM_PRFLT in PX4 to -1 
+
+In MAVLINK Console:
+param set COM_DISARM_PRFLT -1
+*/
+
 #include <rclcpp/rclcpp.hpp>
 #include <fstream>
 #include <filesystem>
 #include <iomanip>
 #include <string>
 #include <vector>
+#include <cmath>
 
 #include <px4_msgs/msg/actuator_motors.hpp>
-#include <px4_msgs/msg/actuator_outputs.hpp>
-#include <px4_msgs/msg/vehicle_acceleration.hpp>
-#include <px4_msgs/msg/vehicle_thrust_setpoint.hpp>
+#include <px4_msgs/msg/vehicle_local_position.hpp>
 #include <px4_msgs/msg/offboard_control_mode.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <actuator_msgs/msg/actuators.hpp>
@@ -29,6 +43,16 @@ public:
                        current_u_(0.05f), 
                        is_sweeping_(true)
     {
+        // declare and retrieve parameters
+        this->declare_parameter("model_name", "fy690s_tilt_0");
+        this->declare_parameter("thrust_coeff", 2.61e-05);
+
+        model_name_ = this->get_parameter("model_name").as_string();
+        thrust_coeff_ = static_cast<float>(this->get_parameter("thrust_coeff").as_double());
+
+        RCLCPP_INFO(this->get_logger(), "Initialized with Model: %s, Thrust Coeff: %e", 
+                    model_name_.c_str(), thrust_coeff_);
+
         // setup directories
         std::string log_dir = "logs/thrust_curve";
         std::filesystem::create_directories(log_dir);
@@ -44,20 +68,13 @@ public:
             "/fmu/in/vehicle_command", 10);
 
         // subscribers
-        actuator_outputs_sub_ = this->create_subscription<px4_msgs::msg::ActuatorOutputs>(
-            "/fmu/out/actuator_outputs", 10,
-            [this](const px4_msgs::msg::ActuatorOutputs::SharedPtr msg) { latest_outputs_ = *msg; });
+        local_pos_sub_ = this->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
+            "/fmu/out/vehicle_local_position", rclcpp::SensorDataQoS(),
+            [this](const px4_msgs::msg::VehicleLocalPosition::SharedPtr msg) { latest_local_pos_ = *msg; });
 
-        accel_sub_ = this->create_subscription<px4_msgs::msg::VehicleAcceleration>(
-            "/fmu/out/vehicle_acceleration", 10,
-            [this](const px4_msgs::msg::VehicleAcceleration::SharedPtr msg) { latest_accel_ = *msg; });
-
-        thrust_sub_ = this->create_subscription<px4_msgs::msg::VehicleThrustSetpoint>(
-            "/fmu/out/vehicle_thrust_setpoint", 10,
-            [this](const px4_msgs::msg::VehicleThrustSetpoint::SharedPtr msg) { latest_thrust_ = *msg; });
-
+        // Use the dynamically loaded model_name_ for the topic
         gz_actuators_sub_ = this->create_subscription<actuator_msgs::msg::Actuators>(
-            "/fy690s_tilt_0/command/motor_speed", 10,
+            "/" + model_name_ + "/command/motor_speed", 10,
             [this](const actuator_msgs::msg::Actuators::SharedPtr msg) { latest_gz_actuators_ = *msg; });
 
         // open first CSV file
@@ -96,8 +113,7 @@ private:
                   << "motor_index,"
                   << "u_cmd,"
                   << "actuator_motors_control,"
-                  << "actuator_outputs_output,"
-                  << "gazebo_rotor_velocity_rpm,"
+                  << "gazebo_rotor_velocity,"
                   << "estimated_thrust,"
                   << "vehicle_acceleration_z\n";
     }
@@ -164,7 +180,7 @@ private:
         publish_vehicle_command(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0f);
     }
 
-void engage_offboard_mode()
+    void engage_offboard_mode()
     {
         RCLCPP_INFO(this->get_logger(), "Switching to Offboard mode...");
         // param1 = 1 (custom mode), param2 = 6 (Offboard)
@@ -195,24 +211,20 @@ void engage_offboard_mode()
             // extract the relevant telemetry for the current motor being tested
             float act_control = latest_actuator_motors_.control[current_motor_];
             
-            float act_output = 0.0f;
-            if (current_motor_ < 16) {
-                act_output = latest_outputs_.output[current_motor_];
-            }
-
             float motor_vel = 0.0f;
             if (current_motor_ < static_cast<int>(latest_gz_actuators_.velocity.size())) {
                 motor_vel = latest_gz_actuators_.velocity[current_motor_];
             }
 
-            float accel_z = latest_accel_.xyz[2];
-            float est_thrust = latest_thrust_.xyz[2];
+            float accel_z = latest_local_pos_.az;
+            
+            // calculate thrust using the dynamic parameter
+            float est_thrust = thrust_coeff_ * motor_vel * std::abs(motor_vel);
 
             csv_file_ << timestamp << ","
                       << current_motor_ << ","
                       << current_u_ << ","
                       << act_control << ","
-                      << act_output << ","
                       << motor_vel << ","
                       << est_thrust << ","
                       << accel_z << "\n";
@@ -234,6 +246,10 @@ void engage_offboard_mode()
         offboard_mode_pub_->publish(msg);
     }
 
+    // parameters
+    std::string model_name_;
+    float thrust_coeff_;
+
     // state variables
     int current_motor_;
     float current_u_;
@@ -250,16 +266,12 @@ void engage_offboard_mode()
     rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_pub_;
 
     // subscribers
-    rclcpp::Subscription<px4_msgs::msg::ActuatorOutputs>::SharedPtr actuator_outputs_sub_;
-    rclcpp::Subscription<px4_msgs::msg::VehicleAcceleration>::SharedPtr accel_sub_;
-    rclcpp::Subscription<px4_msgs::msg::VehicleThrustSetpoint>::SharedPtr thrust_sub_;
+    rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr local_pos_sub_;
     rclcpp::Subscription<actuator_msgs::msg::Actuators>::SharedPtr gz_actuators_sub_;
 
     // data caches
     px4_msgs::msg::ActuatorMotors latest_actuator_motors_;
-    px4_msgs::msg::ActuatorOutputs latest_outputs_;
-    px4_msgs::msg::VehicleAcceleration latest_accel_;
-    px4_msgs::msg::VehicleThrustSetpoint latest_thrust_;
+    px4_msgs::msg::VehicleLocalPosition latest_local_pos_;
     actuator_msgs::msg::Actuators latest_gz_actuators_;
 };
 
