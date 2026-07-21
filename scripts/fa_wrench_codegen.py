@@ -7,7 +7,7 @@ model. The generated workspaces are compiled into ControlAllocationQP.
 """
 
 # defines
-FA_FEASIBILITY_TOL = 1.00e-1
+FA_FEASIBILITY_TOL = 5.00e-1
 FA_MATRIX_TOL = 1.00e-3
 
 
@@ -108,7 +108,7 @@ if np.linalg.matrix_rank(B) != 6:
 # BLOCK 2: VECTOR & MATRIX CREATION
 # ==========================================================================
 
-sw = np.array([10.0, 10.0, 10.0, 1.0, 1.0, 3.0])
+sw = np.array([200.0, 200.0, 100.0, 1.0, 1.0, 3.0])
 Sw = sparse.diags(sw, format="csc")
 Aq = Sw @ sparse.csc_matrix(B)
 
@@ -163,8 +163,8 @@ closest_solver.setup(
     verbose=True,
     warm_starting=True,
     polishing=False,
-    eps_abs=1e-1,
-    eps_rel=1e-1,
+    eps_abs=1e-3,
+    eps_rel=1e-3,
     max_iter=4000,
     rho=0.5,
     adaptive_rho=False,
