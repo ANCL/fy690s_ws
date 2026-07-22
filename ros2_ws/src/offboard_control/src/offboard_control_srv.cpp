@@ -51,9 +51,9 @@ class OffboardControl : public rclcpp::Node {
         mass_ = this->declare_parameter<double>("mass", mass_);
         hover_thrust_ = this->declare_parameter<double>("hover_thrust", hover_thrust_);
         yaw_ = this->declare_parameter<double>("yaw_", 0.0);
-        attitude_tau_ = this->declare_parameter<double>("attitude_tau_", 0.3);
-        norm_thrust_const_ = this->declare_parameter<double>("norm_thrust_const_", 0.009); // 0.034436
-        norm_thrust_offset_ = this->declare_parameter<double>("norm_thrust_offset_", 0.4); // 0.14344
+        attitude_tau_ = this->declare_parameter<double>("attitude_tau_", 0.1);                 // 0.3
+        norm_thrust_const_ = this->declare_parameter<double>("norm_thrust_const_", 0.034436);  //  0.009
+        norm_thrust_offset_ = this->declare_parameter<double>("norm_thrust_offset_", 0.14344); // 0.4
         ref_rate_limit_ = this->declare_parameter<double>("ref_rate_limit_", 1);
         att_control_type_ = this->declare_parameter<std::string>("att_control_type_", "QSF_offset");
 
@@ -152,7 +152,10 @@ class OffboardControl : public rclcpp::Node {
                                          msg->pose_frame, msg->velocity_frame);
                     return;
                 }
-                // This is the ONBOARD EKF2 estimator
+                // Get UAV pose, converted to ENU
+                sls_offset_params_.latest_pos_enu_ = Eigen::Vector3d(msg->position[1], msg->position[0], -msg->position[2]);
+
+                // Get UAV attitude estimate
                 Eigen::Quaterniond q_ned(msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
                 Eigen::Quaterniond q_enu = px4_ros_com::frame_transforms::px4_to_ros_orientation(q_ned);
                 latest_attitude_(0) = q_enu.w();
@@ -161,16 +164,18 @@ class OffboardControl : public rclcpp::Node {
                 latest_attitude_(3) = q_enu.z();
                 attitude_received_ = true;
 
+                // msg->velocity is already in the world frame (NED). Just map to ENU.
+                sls_offset_params_.latest_vel_enu_ = Eigen::Vector3d(msg->velocity[1], msg->velocity[0], -msg->velocity[2]);
+
                 // Rotate Body Frame Twist to World Frame (ENU)
                 Eigen::Quaterniond q_world(latest_attitude_(0), latest_attitude_(1), latest_attitude_(2), latest_attitude_(3));
                 Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
 
-                Eigen::Vector3d lin_vel_body(msg->velocity[0], msg->velocity[1], msg->velocity[2]);
-                Eigen::Vector3d ang_vel_body(msg->angular_velocity[0], msg->angular_velocity[1], msg->angular_velocity[2]);
+                // Convert FRD body rates to FLU body rates (invert Y and Z)
+                Eigen::Vector3d ang_vel_body_flu(msg->angular_velocity[0], -msg->angular_velocity[1], -msg->angular_velocity[2]);
 
                 // V_world = R * V_body
-                sls_offset_params_.latest_vel_enu_ = R_body_to_world * lin_vel_body;
-                sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body;
+                sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body_flu;
             });
 
         uav_odom_sub_ =
