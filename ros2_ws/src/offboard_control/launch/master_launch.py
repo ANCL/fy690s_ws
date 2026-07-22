@@ -118,32 +118,32 @@ def generate_launch_description():
         ),
         
         # --- Vicon Receiver Node ---
-        Node(
-            package='vicon_receiver', 
-            executable='vicon_client', 
-            output='screen',
-            parameters=[{
-                'hostname': hostname, 
-                'buffer_size': buffer_size, 
-                'namespace': topic_namespace,
-                'world_frame': world_frame,
-                'vicon_frame': vicon_frame,
-                'map_xyz': map_xyz,
-                'map_rpy': map_rpy,
-                'map_rpy_in_degrees': map_rpy_in_degrees
-            }]
-        ),
+        # Node(
+        #     package='vicon_receiver', 
+        #     executable='vicon_client', 
+        #     output='screen',
+        #     parameters=[{
+        #         'hostname': hostname, 
+        #         'buffer_size': buffer_size, 
+        #         'namespace': topic_namespace,
+        #         'world_frame': world_frame,
+        #         'vicon_frame': vicon_frame,
+        #         'map_xyz': map_xyz,
+        #         'map_rpy': map_rpy,
+        #         'map_rpy_in_degrees': map_rpy_in_degrees
+        #     }]
+        # ),
 
         # --- Vicon to PX4 Bridge Node ---
-        Node(
-            package='vicon_px4_bridge',
-            executable='vicon_to_px4_ev',
-            name='vicon_to_px4_ev',
-            output='screen',
-            parameters=[{
-                'vicon_topic': ['/', topic_namespace, '/', vicon_frame, '/', vicon_frame], 
-                'ev_topic': '/fmu/in/vehicle_visual_odometry',
-                'use_header_stamp': True
-            }]
-        )
+        # Node(
+        #     package='vicon_px4_bridge',
+        #     executable='vicon_to_px4_ev',
+        #     name='vicon_to_px4_ev',
+        #     output='screen',
+        #     parameters=[{
+        #         'vicon_topic': ['/', topic_namespace, '/', vicon_frame, '/', vicon_frame], 
+        #         'ev_topic': '/fmu/in/vehicle_visual_odometry',
+        #         'use_header_stamp': True
+        #     }]
+        # )
     ])

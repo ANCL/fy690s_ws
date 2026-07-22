@@ -50,9 +50,11 @@ class TrajectoryPublisher : public rclcpp::Node {
   private:
     // internal struct for math
     struct TrajectoryReference {
-        Eigen::Vector3d position;
-        Eigen::Vector3d velocity;
-        Eigen::Vector3d acceleration;
+        Eigen::Vector3d position{};
+        Eigen::Vector3d velocity{};
+        Eigen::Vector3d acceleration{};
+        Eigen::Vector3d jerk{};
+        Eigen::Vector3d snap{};
         float yaw;
     };
 
@@ -101,6 +103,8 @@ class TrajectoryPublisher : public rclcpp::Node {
         msg.position = {(float)ref.position.x(), (float)ref.position.y(), (float)ref.position.z()};
         msg.velocity = {(float)ref.velocity.x(), (float)ref.velocity.y(), (float)ref.velocity.z()};
         msg.acceleration = {(float)ref.acceleration.x(), (float)ref.acceleration.y(), (float)ref.acceleration.z()};
+        msg.jerk = {(float)ref.jerk.x(), (float)ref.jerk.y(), (float)ref.jerk.z()};
+        // msg.snap = {(float)ref.snap.x(), (float)ref.snap.y(), (float)ref.snap.z()}; // Does not exist on this message type, just ignore for now
         msg.yaw = ref.yaw;
         msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 
@@ -138,6 +142,8 @@ class TrajectoryPublisher : public rclcpp::Node {
         ref.position = Eigen::Vector3d(x_offset + R * cos_wt, R * sin_wt, z_ref);
         ref.velocity = Eigen::Vector3d(-R * omega * sin_wt, R * omega * cos_wt, 0.0);
         ref.acceleration = Eigen::Vector3d(-R * omega * omega * cos_wt, -R * omega * omega * sin_wt, 0.0);
+        ref.jerk = Eigen::Vector3d(R * omega * omega * omega * sin_wt, -R * omega * omega * omega * cos_wt, 0.0);
+        ref.snap = Eigen::Vector3d(R * omega * omega * omega * omega * cos_wt, R * omega * omega * omega * omega * sin_wt, 0.0);
         ref.yaw = 0.0f;
 
         return ref;
