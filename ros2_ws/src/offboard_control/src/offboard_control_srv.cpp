@@ -726,6 +726,7 @@ OffboardControl::sls_offset_ned_params OffboardControl::sls_offset_enu_to_ned(Of
     q[0] = vec_load_to_pivot[0] / norm;
     q[1] = vec_load_to_pivot[1] / norm;
     q[2] = vec_load_to_pivot[2] / norm;
+    
     // find pendrate = q.cross(loadVel - Pivot_Vel);
     // Pivot_Vel = vel_ned + dR*L = vel_ned+ sls_offset_params.R_bi*hat(Omega)*L
     Eigen::Matrix3d Omega_hat_;
@@ -784,16 +785,6 @@ std::pair<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>> OffboardControl::
     double K1_int[5] = {sls_offset_params_.Kx_int, sls_offset_params_.Kx_pos, sls_offset_params_.Kx_vel, sls_offset_params_.Kx_acc, sls_offset_params_.Kx_jerk};
     double K2_int[5] = {sls_offset_params_.Ky_int, sls_offset_params_.Ky_pos, sls_offset_params_.Ky_vel, sls_offset_params_.Ky_acc, sls_offset_params_.Ky_jerk};
     double K3_int[3] = {sls_offset_params_.Kz_int, sls_offset_params_.Kz_pos, sls_offset_params_.Kz_vel};
-
-    // Convert ENU references to NED for the QSF controller
-    // Eigen::Vector3d pos_des_ned(pos_des_enu.y(), pos_des_enu.x(), -pos_des_enu.z());
-    // Eigen::Vector3d vel_des_ned(vel_des_enu.y(), vel_des_enu.x(), -vel_des_enu.z());
-    // Eigen::Vector3d acc_des_ned(acc_des_enu.y(), acc_des_enu.x(), -acc_des_enu.z());
-    // Eigen::Vector3d jerk_des_ned(jerk_des_enu.y(), jerk_des_enu.x(), -jerk_des_enu.z());
-    // Eigen::Vector3d snap_des_ned(snap_des_enu.y(), snap_des_enu.x(), -snap_des_enu.z());
-
-    // double ref_traj[15] = {pos_des_ned.x(),  vel_des_ned.x(),  acc_des_ned.x(), jerk_des_ned.x(), snap_des_ned.x(), pos_des_ned.y(),  vel_des_ned.y(), acc_des_ned.y(),
-    //                        jerk_des_ned.y(), snap_des_ned.y(), pos_des_ned.z(), vel_des_ned.z(),  acc_des_ned.z(),  jerk_des_ned.z(), snap_des_ned.z()};
 
     double ref_traj[15] = {pos_des_enu.x(),  vel_des_enu.x(),  acc_des_enu.x(), jerk_des_enu.x(), snap_des_enu.x(), pos_des_enu.y(),  vel_des_enu.y(), acc_des_enu.y(),
                            jerk_des_enu.y(), snap_des_enu.y(), pos_des_enu.z(), vel_des_enu.z(),  acc_des_enu.z(),  jerk_des_enu.z(), snap_des_enu.z()};
