@@ -414,8 +414,8 @@ void OffboardControl::publish_trajectory_setpoint() {
     }
 
     Eigen::Vector3d a_cmd{};
-    Eigen::Vector4d q_cmd;
-    std::pair<Eigen::Vector3d, double> rate_thrust_cmd;
+    Eigen::Vector4d q_cmd{};
+    std::pair<Eigen::Vector3d, double> rate_thrust_cmd{};
     const Eigen::Vector3d p(latest_local_pos_.x, latest_local_pos_.y, latest_local_pos_.z);
     const Eigen::Vector3d v(latest_local_pos_.vx, latest_local_pos_.vy, latest_local_pos_.vz);
     Eigen::Vector3d p_ref(latest_ref_.position[0], latest_ref_.position[1], latest_ref_.position[2]);
@@ -499,12 +499,12 @@ void OffboardControl::publish_trajectory_setpoint() {
         debug_trajectory_setpoint_publisher_->publish(debug_msg);
     } else if (control_mode_ == "attitude" && attitude_received_) {
         publish_attitude_setpoints(rate_thrust_cmd.second, q_cmd);
-        msg.position = {static_cast<float>(p_ref.x() - 0.12), static_cast<float>(p_ref.y() + 0.12), static_cast<float>(p_ref.z() - 0.06 - 0.75)};
+        msg.position = {static_cast<float>(p_ref.x() + 0.12), static_cast<float>(p_ref.y() - 0.12), static_cast<float>(p_ref.z() - 0.06 - 0.75)};
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
     } else if (control_mode_ == "rate" && attitude_received_) {
         publish_rate_setpoints(rate_thrust_cmd.first, rate_thrust_cmd.second);
-        msg.position = {static_cast<float>(p_ref.x() - 0.12), static_cast<float>(p_ref.y() + 0.12), static_cast<float>(p_ref.z() - 0.06 - 0.75)};
+        msg.position = {static_cast<float>(p_ref.x() + 0.12), static_cast<float>(p_ref.y() - 0.12), static_cast<float>(p_ref.z() - 0.06 - 0.75)};
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
     } else {
