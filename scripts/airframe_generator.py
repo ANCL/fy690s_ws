@@ -6,12 +6,41 @@ from jinja2 import Template
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import check_fa_hex_allocation as checker
+import fa_wrench_codegen as codegen
 
-def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6004_gz_fy690s_tilt"):
-    radius = 0.360
-    km_vals = [0.0185, -0.0185, 0.0185, -0.0185, 0.0185, -0.0185]
+def parse_input_vector(env_string, default_values, is_beta=False):
+    if not env_string:
+        return default_values
+    if "," in env_string:
+        try:
+            parsed = [float(x.strip()) for x in env_string.split(",")]
+            if len(parsed) != 6:
+                print(f"ERROR: Array must contain exactly 6 elements. Got {len(parsed)}.")
+                sys.exit(1)
+            if is_beta:
+                return [-abs(x) for x in parsed]
+            return parsed
+        except ValueError:
+            print(f"ERROR: Could not parse array values from: {env_string}")
+            sys.exit(1)
+    else:
+        try:
+            mag = float(env_string)
+            if is_beta:
+                return [-abs(mag)] * 6
+            else:
+                return [mag, -mag, mag, -mag, mag, -mag]
+        except ValueError:
+            print(f"ERROR: Could not parse scalar value: {env_string}")
+            sys.exit(1)
+
+def generate_airframe_files_and_solvers(alphas_deg, betas_deg, gammas_deg, repo_root, filename):
+    radius = 0.360 # 36 cm
+    km_vals = [-0.0185, 0.0185, -0.0185, 0.0185, -0.0185, 0.0185]
+    z_offset = -0.04 # -0.04 worked great # rotor offset reletive to CoM UP in body frame
+    motor_height = 0.045 # 4.5 cm
     ct_vals = [17.658, 17.658, 17.658, 17.658, 17.658, 17.658]
-    directions = ["CCW", "CW", "CCW", "CW", "CCW", "CW"]
+    directions = ["CW", "CCW", "CW", "CCW", "CW", "CCW"]
     base_angles = [30.0, 90.0, 150.0, 210.0, 270.0, 330.0]
 
     alphas_rad = [math.radians(a) for a in alphas_deg]
@@ -25,6 +54,8 @@ def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6004_gz_
         betas=betas_rad, 
         gammas=gammas_rad, 
         km_values=km_vals, 
+        z_offset=z_offset,
+        h=motor_height,
         theta0=math.radians(30.0)
     )
 
@@ -35,7 +66,6 @@ def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6004_gz_
     if rank < 6:
         raise ValueError(f"ABORT: Allocation matrix is rank-deficient (Rank {rank}/6). 6 DOFs cannot be achieved.")
     
-    # Evaluate Condition Number (cond)
     if cond > 500:
         print(f"\n==================================================")
         print(f"CRITICAL ABORT: HIGHLY ILL-CONDITIONED MATRIX")
@@ -56,7 +86,7 @@ def generate_airframe_file(alphas_deg, betas_deg, gammas_deg, filename="6004_gz_
         print(f"Rank: {rank} | Condition Number: {cond:.2f}")
         print(f"==================================================\n")
 
-    # 3. Write Configuration using the vectors provided by the checker
+    # 3. Write Airframe Configuration
     header = """#!/bin/sh
 . ${R}etc/init.d/rc.fa_defaults
 PX4_SIMULATOR=${PX4_SIMULATOR:=gz}
@@ -87,7 +117,6 @@ param set-default SYS_AUTOSTART 6004
 # Wait 15 seconds for EKF to align, then command the mode switch to FA Position mode 
 (sleep 15 && commander mode fa_position) &
 """
-
     with open(filename, 'w') as f:
         f.write(header)
         for i in range(6):
@@ -109,33 +138,15 @@ param set-default SYS_AUTOSTART 6004
         f.write(footer)
     print(f"Airframe configuration safely written to '{filename}'.")
 
-
-def parse_input_vector(env_string, default_values, is_beta=False):
-    if not env_string:
-        return default_values
-    if "," in env_string:
-        try:
-            parsed = [float(x.strip()) for x in env_string.split(",")]
-            if len(parsed) != 6:
-                print(f"ERROR: Array must contain exactly 6 elements. Got {len(parsed)}.")
-                sys.exit(1)
-            if is_beta:
-                return [-abs(x) for x in parsed]
-            return parsed
-        except ValueError:
-            print(f"ERROR: Could not parse array values from: {env_string}")
-            sys.exit(1)
-    else:
-        try:
-            mag = float(env_string)
-            if is_beta:
-                return [-abs(mag)] * 6
-            else:
-                return [mag, -mag, mag, -mag, mag, -mag]
-        except ValueError:
-            print(f"ERROR: Could not parse scalar value: {env_string}")
-            sys.exit(1)
-
+    # 4. Generate OSQP C-Code Headers
+    print("\n--- Generating OSQP Workspaces ---")
+    codegen.generate_osqp_workspaces(
+        positions=positions, 
+        thrusts=thrusts, 
+        KM=km_vals, 
+        CT=ct_vals, 
+        repo_root_path=repo_root
+    )
 
 if __name__ == "__main__":
     repo_root = os.getcwd()
@@ -150,12 +161,12 @@ if __name__ == "__main__":
     test_betas  = parse_input_vector(raw_beta, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], is_beta=True)
     test_gammas = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-    print(f"\n--- Generating FY690S Airframe & SDF ---")
+    print(f"\n--- Generating FY690S Configuration ---")
     print(f"Alphas mapped: {test_alphas}")
     print(f"Betas mapped:  {test_betas}")
 
     try:
-        generate_airframe_file(test_alphas, test_betas, test_gammas, filename=airframe_out)
+        generate_airframe_files_and_solvers(test_alphas, test_betas, test_gammas, repo_root, airframe_out)
     except Exception as e:
         print(f"\n{e}")
         sys.exit(1)
