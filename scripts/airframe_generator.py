@@ -165,7 +165,7 @@ if __name__ == "__main__":
             template_content = f.read()
 
         template = Template(template_content)
-        rendered_sdf = template.render(alphas=test_alphas, betas=test_betas)
+        rendered_sdf = template.render(alphas=test_alphas, betas=test_betas, math=math)
 
         with open(sdf_out_path, "w") as f:
             f.write(rendered_sdf)
