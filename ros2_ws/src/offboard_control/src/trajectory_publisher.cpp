@@ -177,8 +177,8 @@ private:
         TrajectoryReference ref{};
         const double z = -1.2;
 
-        ref.velocity = Eigen::Vector3d(NAN, NAN, NAN);
-        ref.acceleration = Eigen::Vector3d(NAN, NAN , NAN);
+        ref.velocity = Eigen::Vector3d(0.0, 0.0, 0.0);
+        ref.acceleration = Eigen::Vector3d(0.0, 0.0, 0.0);
         ref.yaw = 0.0f;
 
         // wrap the time to a 80-second repeating period
