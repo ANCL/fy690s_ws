@@ -166,4 +166,16 @@ TODO: disable GPS, disable magnetometer, allow arming without GPS, etc.
 ### Configure Garmin LiDAR on I2C
 TODO: connect distance sensor 
 
+### Offboard Control Modes
+## Position Control
+## Velocity Control
+## Acceleration Control
+## SLS Offset Attitude, Body Rate, and Torque-Thrust Control
+To run the QSF slung load system offset simulation:
+1. Run the slung load PX4 model with the same masses, inertias, and offsets as configured in the code. (e.g. f450 model with slung load offset).
+2. Run the master_launch.py control file (same as normal offboard control).
+3. Ensure att_control_type_ is set to "QSF_offset".
+4. For safety, the simulation can be started with control_mode set to "position", however once flying, change control_mode to either "attitude", "rate", or "torque" (NOT FUNCTIONAL YET, DO NOT USE) to begin flying with the QSF offset SLS controller.
+5. If necessary, tune gains to improve the performance.
+
 ## Vehicle Power/Actuator/Sensor Calibration
