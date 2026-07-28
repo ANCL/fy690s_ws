@@ -17,15 +17,15 @@ find_package(tf2 REQUIRED)
 # Changed from add_executable to add_library
 add_library(sls_qsf 
     # QSF offset controllers
-    # src/Inner_loop/Inner_loop.cpp
+    src/Inner_loop/Inner_loop.cpp
     src/QSF_w_offset_intctrl_U/QSF_w_offset_intctrl_U.cpp
     src/QSF_w_offset_intctrl_U/rt_nonfinite.cpp
     src/QSF_w_offset_intctrl_U/rtGetInf.cpp
     src/QSF_w_offset_intctrl_U/rtGetNaN.cpp
     src/QSF_w_offset_intctrl/QSF_w_offset_intctrl.cpp # ccece 2025 controller
 
-    # differential flatness generator
-    # src/diff_flatness_mission_QSF/diff_flatness_mission_QSF.cpp
+    # Differential flatness generator
+    src/diff_flatness_mission_QSF/diff_flatness_mission_QSF.cpp
     # src/diff_flatness_fig8_QSF/diff_flatness_fig8_QSF.cpp
     # src/diff_flatness_fig8_QSF/rt_nonfinite.cpp
     # src/diff_flatness_fig8_QSF/rtGetInf.cpp
