@@ -176,6 +176,6 @@ To run the QSF slung load system offset simulation:
 2. Run the master_launch.py control file (same as normal offboard control).
 3. Ensure att_control_type_ is set to "QSF_offset".
 4. For safety, the simulation can be started with control_mode set to "position", however once flying, change control_mode to either "attitude", "rate", or "torque" (NOT FUNCTIONAL YET, DO NOT USE) to begin flying with the QSF offset SLS controller.
-5. If necessary, tune gains to improve the performance.
+5. If necessary, tune gains to improve the performance. The trajectory can be changed during flight to the usual "hover", "circle", "figure8", etc.
 
 ## Vehicle Power/Actuator/Sensor Calibration
