@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-def calculate_rotor_vectors(i, alpha_rad, beta_rad, gamma_rad, L, z_offset, h, theta0=0.0):
+def calculate_rotor_vectors(i, alpha_rad, beta_rad, gamma_rad, L, x_offset, y_offset, z_offset, h, theta0=0.0):
     """Calculates the position and thrust vectors for a single rotor in the PX4 FRD frame."""
     theta = theta0 + i * (math.pi / 3.0)
     phi_rad = theta + gamma_rad
@@ -13,8 +13,8 @@ def calculate_rotor_vectors(i, alpha_rad, beta_rad, gamma_rad, L, z_offset, h, t
 
     # Position in Gazebo FLU
     # motor height acts in thrust direction
-    x_flu = L * math.cos(phi_rad) + h * v_flu_x
-    y_flu = L * math.sin(phi_rad) + h * v_flu_y
+    x_flu = x_offset + L * math.cos(phi_rad) + h * v_flu_x
+    y_flu = y_offset + L * math.sin(phi_rad) + h * v_flu_y
     z_flu = z_offset + h * v_flu_z
 
     # Convert to PX4 FRD
@@ -35,14 +35,14 @@ def calculate_rotor_vectors(i, alpha_rad, beta_rad, gamma_rad, L, z_offset, h, t
     return r_i, f_i
 
 
-def build_allocation_matrix(L, z_offset, h, alphas, betas, gammas, km_values, theta0=0.0):
+def build_allocation_matrix(L, x_offset, y_offset, z_offset, h, alphas, betas, gammas, km_values, theta0=0.0):
     """Builds the 6x6 allocation matrix and returns it alongside the physical vectors."""
     B = np.zeros((6, 6))
     positions = []
     thrusts = []
 
     for i in range(6):
-        r_i, f_i = calculate_rotor_vectors(i, alphas[i], betas[i], gammas[i], L, z_offset, h, theta0)
+        r_i, f_i = calculate_rotor_vectors(i, alphas[i], betas[i], gammas[i], L, x_offset, y_offset, z_offset, h, theta0)
         positions.append(r_i)
         thrusts.append(f_i)
         

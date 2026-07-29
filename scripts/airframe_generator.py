@@ -37,8 +37,10 @@ def parse_input_vector(env_string, default_values, is_beta=False):
 def generate_airframe_files_and_solvers(alphas_deg, betas_deg, gammas_deg, repo_root, filename):
     radius = 0.360 # 36 cm
     km_vals = [-0.0185, 0.0185, -0.0185, 0.0185, -0.0185, 0.0185]
-    z_offset = -0.04 # -0.04 worked great # rotor offset reletive to CoM UP in body frame
-    motor_height = 0.045 # 4.5 cm
+    x_offset = 0.00 # constant rotor offset reletive to CoM FORWARD in body frame
+    y_offset = 0.00 # constant rotor offset reletive to CoM LEFT in body frame
+    z_offset = -0.023 # z-offset of the of the center arm reletive to the CoM
+    motor_height = 0.0405 # height of motor
     ct_vals = [17.658, 17.658, 17.658, 17.658, 17.658, 17.658]
     directions = ["CW", "CCW", "CW", "CCW", "CW", "CCW"]
     base_angles = [30.0, 90.0, 150.0, 210.0, 270.0, 330.0]
@@ -54,6 +56,8 @@ def generate_airframe_files_and_solvers(alphas_deg, betas_deg, gammas_deg, repo_
         betas=betas_rad, 
         gammas=gammas_rad, 
         km_values=km_vals, 
+        x_offset=x_offset,
+        y_offset=y_offset,
         z_offset=z_offset,
         h=motor_height,
         theta0=math.radians(30.0)
