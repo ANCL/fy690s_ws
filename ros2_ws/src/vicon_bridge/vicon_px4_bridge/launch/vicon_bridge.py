@@ -61,7 +61,10 @@ def generate_launch_description():
             parameters=[{
                 'vicon_topic': ['/', topic_namespace, '/', vicon_frame, '/', vicon_frame], 
                 'ev_topic': '/fmu/in/vehicle_visual_odometry',
-                'use_header_stamp': True
+                'use_header_stamp': True,
+                'publish_velocity': True,
+                'enable_velocity_lowpass': False,
+                'velocity_lowpass_cutoff_hz': 5.0
             }]
         )
     ])

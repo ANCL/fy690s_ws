@@ -25,6 +25,8 @@
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
 
+#include <geometry_msgs/msg/pose_stamped.hpp>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -62,12 +64,12 @@ class OffboardControl : public rclcpp::Node {
         att_control_type_ = this->declare_parameter<std::string>("att_control_type_", "QSF_offset");
 
         // QSF gains
-        sls_offset_params_.Kx_int = this->declare_parameter<double>("Kx_int", 0.0);
+        sls_offset_params_.Kx_int = this->declare_parameter<double>("Kx_int", 1.0);
         sls_offset_params_.Kx_pos = this->declare_parameter<double>("Kx_pos", 31.6228);
         sls_offset_params_.Kx_vel = this->declare_parameter<double>("Kx_vel", 40.9156);
         sls_offset_params_.Kx_acc = this->declare_parameter<double>("Kx_acc", 24.8885);
         sls_offset_params_.Kx_jerk = this->declare_parameter<double>("Kx_jerk", 7.7316);
-        sls_offset_params_.Ky_int = this->declare_parameter<double>("Ky_int", 0.0);
+        sls_offset_params_.Ky_int = this->declare_parameter<double>("Ky_int", 1.0);
         sls_offset_params_.Ky_pos = this->declare_parameter<double>("Ky_pos", 31.6228);
         sls_offset_params_.Ky_vel = this->declare_parameter<double>("Ky_vel", 40.9156);
         sls_offset_params_.Ky_acc = this->declare_parameter<double>("Ky_acc", 24.8885);
@@ -146,7 +148,7 @@ class OffboardControl : public rclcpp::Node {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode disengaged.");
                 }
             });
-
+        
         vehicle_attitude_subscriber_ =
             this->create_subscription<px4_msgs::msg::VehicleAttitude>("/fmu/out/vehicle_attitude", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleAttitude::SharedPtr msg) {
                 // This is the ONBOARD EKF2 estimator
@@ -159,6 +161,7 @@ class OffboardControl : public rclcpp::Node {
                 // attitude_received_ = true;
             });
 
+        // use FMU odometry
         vehicle_odometry_subscriber_ =
             this->create_subscription<px4_msgs::msg::VehicleOdometry>("/fmu/out/vehicle_odometry", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
                 // When frame == 1, it is in NED
@@ -192,32 +195,34 @@ class OffboardControl : public rclcpp::Node {
                 // V_world = R * V_body
                 sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body_flu;
             });
-
+        
+        // if using sim
         uav_odom_sub_ =
             this->create_subscription<nav_msgs::msg::Odometry>("/model/px4vision_sls_0/odometry_with_covariance", rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
-                // current_sim_time_ = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+                // //current_sim_time_ = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
 
                 // Drone
-                // sls_offset_params_.latest_pos_enu_ << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
-                // latest_attitude_(0) = msg->pose.pose.orientation.w;
-                // latest_attitude_(1) = msg->pose.pose.orientation.x;
-                // latest_attitude_(2) = msg->pose.pose.orientation.y;
-                // latest_attitude_(3) = msg->pose.pose.orientation.z;
+                sls_offset_params_.latest_pos_enu_ << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
+                latest_attitude_(0) = msg->pose.pose.orientation.w;
+                latest_attitude_(1) = msg->pose.pose.orientation.x;
+                latest_attitude_(2) = msg->pose.pose.orientation.y;
+                latest_attitude_(3) = msg->pose.pose.orientation.z;
 
-                // // Rotate Body Frame Twist to World Frame (ENU)
-                // Eigen::Quaterniond q_world(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
-                // Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
+                // Rotate Body Frame Twist to World Frame (ENU)
+                Eigen::Quaterniond q_world(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
+                Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
 
-                // Eigen::Vector3d lin_vel_body(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
-                // Eigen::Vector3d ang_vel_body(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
+                Eigen::Vector3d lin_vel_body(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
+                Eigen::Vector3d ang_vel_body(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
 
-                // // V_world = R * V_body
-                // sls_offset_params_.latest_vel_enu_ = R_body_to_world * lin_vel_body;
-                // sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body;
+                // V_world = R * V_body
+                sls_offset_params_.latest_vel_enu_ = R_body_to_world * lin_vel_body;
+                sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body;
 
-                // attitude_received_ = true;
+                attitude_received_ = true;
             });
-
+        
+        // if using sim
         load_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>("/model/px4vision_sls_0/load_odom", rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
             // Load
             sls_offset_params_.load_pos_enu_ << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
@@ -235,6 +240,18 @@ class OffboardControl : public rclcpp::Node {
 
             sls_offset_params_.load_received_ = true;
         });
+
+        // if using vicon
+        load_vicon_odom_sub_ = this->create_subscription<px4_msgs::msg::VehicleOdometry>("/load/load_odometry", rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+            // vicon bridge converts to NED, need to convert to ENU
+            sls_offset_params_.load_pos_enu << msg->position.position[1], msg->position.position[0], -msg->position.position[2];
+
+            Eigen::Quaterniond q_load(msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
+            Eigen::Matrix3d R_load_body_to_world = q_load.toRotationMatrix();
+
+            Eigen::Vector3d lin_vel_body(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
+            Eigen::Vector3d ang_vel_body(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
+        }
     }
 
   private:
@@ -256,6 +273,8 @@ class OffboardControl : public rclcpp::Node {
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr vehicle_odometry_subscriber_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr uav_odom_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr load_odom_sub_;
+    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr uav_vicon_odom_sub_;
+    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr load_vicon_odom_sub_;
 
     // State Variables
     px4_msgs::msg::VehicleLocalPosition latest_local_pos_{};
@@ -292,7 +311,8 @@ class OffboardControl : public rclcpp::Node {
         double R_bi[9];
         Eigen::Matrix3d R_Bd;                      // Desired UAV attitude
         double l = 0.75;                           // Cable length
-        double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
+        //double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
+        double L_offset_[3] = {0.0, 0.0, 0.0};
         double phi_rad_, theta_rad_, psi_rad_;
         double alpha, beta;                         // load angles
         double dalpha, dbeta;                       // load angle rates
@@ -556,18 +576,18 @@ void OffboardControl::publish_trajectory_setpoint() {
         debug_trajectory_setpoint_publisher_->publish(debug_msg);
     } else if (control_mode_ == "attitude" && attitude_received_) {
         publish_attitude_setpoints(rate_thrust_cmd.second, q_cmd);
-        msg.position = {static_cast<float>(p_ref.x() + 0.12), static_cast<float>(p_ref.y() - 0.12), static_cast<float>(p_ref.z() - 0.06 - 0.75)};
+        msg.position = {static_cast<float>(p_ref.x() + sls_offset_params_.L_offset_[0]), static_cast<float>(p_ref.y() + sls_offset_params_.L_offset_[1]), static_cast<float>(p_ref.z() - sls_offset_params_.L_offset_[2] - sls_offset_params_.l)};
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
     } else if (control_mode_ == "rate" && attitude_received_) {
         publish_rate_setpoints(rate_thrust_cmd.first, rate_thrust_cmd.second);
-        msg.position = {static_cast<float>(p_ref.x() + 0.12), static_cast<float>(p_ref.y() - 0.12), static_cast<float>(p_ref.z() - 0.06 - 0.75)};
+        msg.position = {static_cast<float>(p_ref.x() + sls_offset_params_.L_offset_[0]), static_cast<float>(p_ref.y() + sls_offset_params_.L_offset_[1]), static_cast<float>(p_ref.z() - sls_offset_params_.L_offset_[2] - sls_offset_params_.l)};
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
     } else if (control_mode_ == "torque" && attitude_received_ && (att_control_type_ == "QSF_offset")) {
         // Currently only supports QSF offset control. If this changes later, this condition should be updated to allow other control types.
         publish_torque_thrust_setpoints(torque_cmd, rate_thrust_cmd.second);
-        msg.position = {static_cast<float>(p_ref.x() + 0.12), static_cast<float>(p_ref.y() - 0.12), static_cast<float>(p_ref.z() - 0.06 - 0.75)};
+        msg.position = {static_cast<float>(p_ref.x() + sls_offset_params_.L_offset_[0]), static_cast<float>(p_ref.y() + sls_offset_params_.L_offset_[1]), static_cast<float>(p_ref.z() - sls_offset_params_.L_offset_[2] - sls_offset_params_.l)};
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
     } else {
@@ -919,12 +939,12 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
 
     Inner_loop(rpy_angles, Omega, sls_offset_params_.R_Bd.data(), Omegad, dOmegad, -mass_ * thrust_command, gains, physics_parameters, sls_offset_params_.L_offset_, ddxi_flat, load_acc, taub, tau,
                rate_sp_dt);
-
+    /*
     RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 250,
                          "[InnerLoop] Omega(NED): [%.2f, %.2f, %.2f] | Omegad: [%.2f, %.2f, %.2f]\n"
                          "            Raw taub: [%.2f, %.2f, %.2f] | Thrust: %.3f",
                          Omega[0], Omega[1], Omega[2], Omegad[0], Omegad[1], Omegad[2], taub[0], taub[1], taub[2], thrust_command);
-
+    */
     // Normalize tau for torque and thrust setpoint to [-1, 1]
     tau[0] = std::clamp(tau[0] / sls_offset_params_.tau_x_max_, -1.0, 1.0);
     tau[1] = std::clamp(tau[1] / sls_offset_params_.tau_y_max_, -1.0, 1.0);
