@@ -1,3 +1,16 @@
+/**
+ * @brief A ROS 2 node that bridges Vicon motion capture data for a Suspended Load System (SLS).
+ * 
+ * This node subscribes to raw pose data (PoseStamped) for both a drone and its attached load.
+ * It numerically differentiates the poses and applies a low-pass filter to estimate linear 
+ * and angular velocities. 
+ * 
+ * It publishes:
+ * - nav_msgs::msg::Odometry: Full pose and twist in the World (ENU) frame for both the drone and the load.
+ * - px4_msgs::msg::VehicleOdometry: Pose-only data translated to the PX4 (NED) frame to feed 
+ *   the drone's EKF2 estimator (velocities are explicitly masked out to prevent injecting noise).
+ */
+
 #include <rclcpp/rclcpp.hpp>
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -57,6 +70,7 @@ public:
     value_.setZero();
   }
 
+  // applies first-order low-pass filter to the input
   Eigen::Vector3d update(const Eigen::Vector3d &input, double dt)
   {
     if (!input.allFinite() || dt <= kMinimumDt) {
@@ -80,6 +94,7 @@ private:
   Eigen::Vector3d value_{Eigen::Vector3d::Zero()};
 };
 
+// maps a rotation matrix to an axis-angle vector to find angular velocity
 Eigen::Vector3d so3Log(const Eigen::Matrix3d &rotation)
 {
   const double cos_angle = std::clamp(
@@ -145,7 +160,6 @@ public:
   SLSViconBridge()
   : Node("sls_vicon_bridge")
   {
-    // Declare topic parameters
     declare_parameter<std::string>("vicon_drone_topic", "/vicon/F450_1/F450_1");
     declare_parameter<std::string>("vicon_load_topic", "/vicon/load_1/load_1");
     
@@ -153,13 +167,11 @@ public:
     declare_parameter<std::string>("odom_load_topic", "/vicon/load_1/odom");
     declare_parameter<std::string>("px4_ev_topic", "/fmu/in/vehicle_visual_odometry");
 
-    // Declare configuration parameters
     declare_parameter<bool>("use_header_stamp", true);
     declare_parameter<double>("linear_velocity_lowpass_cutoff_hz", 5.0);
     declare_parameter<double>("angular_velocity_lowpass_cutoff_hz", 5.0);
     declare_parameter<double>("max_sample_interval_s", 0.1);
 
-    // Retrieve parameters
     vicon_drone_topic_ = get_parameter("vicon_drone_topic").as_string();
     vicon_load_topic_ = get_parameter("vicon_load_topic").as_string();
     odom_drone_topic_ = get_parameter("odom_drone_topic").as_string();
@@ -175,13 +187,11 @@ public:
       throw std::runtime_error("max_sample_interval_s must be positive.");
     }
 
-    // Initialize states
     drone_state_.linear_velocity_filter.setCutoff(linear_cutoff);
     drone_state_.angular_velocity_filter.setCutoff(angular_cutoff);
     load_state_.linear_velocity_filter.setCutoff(linear_cutoff);
     load_state_.angular_velocity_filter.setCutoff(angular_cutoff);
 
-    // Create subscribers
     sub_drone_ = create_subscription<PoseStamped>(
       vicon_drone_topic_, rclcpp::SensorDataQoS(),
       std::bind(&SLSViconBridge::dronePoseCallback, this, std::placeholders::_1));
@@ -190,7 +200,6 @@ public:
       vicon_load_topic_, rclcpp::SensorDataQoS(),
       std::bind(&SLSViconBridge::loadPoseCallback, this, std::placeholders::_1));
 
-    // Create publishers
     pub_odom_drone_ = create_publisher<Odometry>(odom_drone_topic_, rclcpp::SensorDataQoS());
     pub_odom_load_ = create_publisher<Odometry>(odom_load_topic_, rclcpp::SensorDataQoS());
     pub_px4_ev_ = create_publisher<VehicleOdometry>(px4_ev_topic_, rclcpp::SensorDataQoS());
@@ -202,6 +211,7 @@ public:
   }
 
 private:
+  // extracts timestamp from header or falls back to current clock
   uint64_t sampleTimeUs(const PoseStamped &msg) const
   {
     const bool header_stamp_valid = msg.header.stamp.sec != 0 || msg.header.stamp.nanosec != 0;
@@ -211,6 +221,7 @@ private:
     return static_cast<uint64_t>(get_clock()->now().nanoseconds() / 1000LL);
   }
 
+  // computes velocities via finite differences and applies low-pass filters
   DerivativeStatus calculateVelocities(
     ObjectState &state,
     const Eigen::Vector3d &position_enu,
@@ -275,6 +286,7 @@ private:
     odom.twist.twist.angular.z = nan;
   }
 
+  // transforms raw vicon pose into an enu odometry message with estimated twist
   std::optional<Odometry> processEnuOdometry(const PoseStamped::SharedPtr &msg, ObjectState &state)
   {
     const uint64_t sample_us = sampleTimeUs(*msg);
@@ -334,15 +346,14 @@ private:
     return odom;
   }
 
+  // processes drone pose to publish standard enu odometry and px4-compatible ned odometry
   void dronePoseCallback(const PoseStamped::SharedPtr msg)
   {
-    // Process Standard ENU Odometry
     auto drone_odom = processEnuOdometry(msg, drone_state_);
     if (drone_odom) {
       pub_odom_drone_->publish(drone_odom.value());
     }
 
-    // Process PX4 Visual Odometry (NED frame, raw pose only - No derived velocities fed to FMU)
     const uint64_t sample_us = sampleTimeUs(*msg);
 
     Eigen::Vector3d p_enu(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
@@ -366,7 +377,6 @@ private:
     px4_odom.q[2] = static_cast<float>(q_px4.y());
     px4_odom.q[3] = static_cast<float>(q_px4.z());
 
-    // Explicitly mask out velocity tracking so the EKF doesn't ingest noisy differentiated data
     px4_odom.velocity_frame = VehicleOdometry::VELOCITY_FRAME_UNKNOWN;
     px4_odom.velocity[0] = NAN; px4_odom.velocity[1] = NAN; px4_odom.velocity[2] = NAN;
     px4_odom.angular_velocity[0] = NAN; px4_odom.angular_velocity[1] = NAN; px4_odom.angular_velocity[2] = NAN;
@@ -381,16 +391,15 @@ private:
     pub_px4_ev_->publish(px4_odom);
   }
 
+  // processes load pose to publish standard enu odometry
   void loadPoseCallback(const PoseStamped::SharedPtr msg)
   {
-    // Process Standard ENU Odometry for the load
     auto load_odom = processEnuOdometry(msg, load_state_);
     if (load_odom) {
       pub_odom_load_->publish(load_odom.value());
     }
   }
 
-  // Configuration settings
   std::string vicon_drone_topic_;
   std::string vicon_load_topic_;
   std::string odom_drone_topic_;
@@ -400,15 +409,12 @@ private:
   bool use_header_stamp_{true};
   double max_sample_interval_s_{0.1};
 
-  // State objects encapsulating prior pose & low-pass filters for differentiation
   ObjectState drone_state_;
   ObjectState load_state_;
 
-  // Subscribers
   rclcpp::Subscription<PoseStamped>::SharedPtr sub_drone_;
   rclcpp::Subscription<PoseStamped>::SharedPtr sub_load_;
 
-  // Publishers
   rclcpp::Publisher<Odometry>::SharedPtr pub_odom_drone_;
   rclcpp::Publisher<Odometry>::SharedPtr pub_odom_load_;
   rclcpp::Publisher<VehicleOdometry>::SharedPtr pub_px4_ev_;
