@@ -9,7 +9,7 @@
 #include "offboard_control/diff_flatness_mission_QSF.h"
 #include "px4_ros_com/frame_transforms.h"
 
-#include <nav_msgs/msg/odometry.hpp>
+#include <nav_msgs/msg/odometry.hpp> 
 #include <px4_msgs/msg/offboard_control_mode.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_attitude.hpp>
@@ -77,6 +77,16 @@ class OffboardControl : public rclcpp::Node {
         sls_offset_params_.Kz_int = this->declare_parameter<double>("Kz_int", 1.0);
         sls_offset_params_.Kz_pos = this->declare_parameter<double>("Kz_pos", 4.0);
         sls_offset_params_.Kz_vel = this->declare_parameter<double>("Kz_vel", 3.0);
+
+        // Determines vicon versus sim for data, and whether to use EKF for UAV state:
+        use_sim_ = this->declare_parameter<bool>("use_sim", true);
+        use_ekf_ = this->declare_parameter<bool>("use_ekf", false);
+        
+        std::string uav_topic = use_sim_ ? "/model/px4vision_sls_0/odometry_with_covariance" : "/vicon/F450_1/odom";
+        std::string load_topic = use_sim_ ? "/model/px4vision_sls_0/load_odom" : "/vicon/load_1/odom";
+        
+        RCLCPP_INFO(this->get_logger(), "Running in %s mode.", use_sim_ ? "SIMULATION" : "EXPERIMENT");
+        RCLCPP_INFO(this->get_logger(), "Using EKF: %s", use_ekf_ ? "TRUE" : "FALSE");
 
         // Geometric controller gains
         kR_ = this->declare_parameter<double>("kR_", 5.0);
@@ -149,6 +159,7 @@ class OffboardControl : public rclcpp::Node {
                 }
             });
         
+        // Should probably get rid of this if not necessary
         vehicle_attitude_subscriber_ =
             this->create_subscription<px4_msgs::msg::VehicleAttitude>("/fmu/out/vehicle_attitude", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleAttitude::SharedPtr msg) {
                 // This is the ONBOARD EKF2 estimator
@@ -164,6 +175,8 @@ class OffboardControl : public rclcpp::Node {
         // use FMU odometry
         vehicle_odometry_subscriber_ =
             this->create_subscription<px4_msgs::msg::VehicleOdometry>("/fmu/out/vehicle_odometry", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
+                if (!use_ekf_) return; // ignore if relying on external vision
+
                 // When frame == 1, it is in NED
                 if ((msg->pose_frame != 1) || (msg->velocity_frame != 1)) {
                     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Bad frame for vehicle_odometry, expected 1 (NED) for velocity and position, got %d and %d. Ignoring.",
@@ -195,63 +208,64 @@ class OffboardControl : public rclcpp::Node {
                 // V_world = R * V_body
                 sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body_flu;
             });
-        
-        // if using sim
+
         uav_odom_sub_ =
-            this->create_subscription<nav_msgs::msg::Odometry>("/model/px4vision_sls_0/odometry_with_covariance", rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+            this->create_subscription<nav_msgs::msg::Odometry>(uav_topic, rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
                 // //current_sim_time_ = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
 
-                // Drone
+                if (use_ekf_) return; // ignore if using EKF measurements
+                
+                // Drone Position & Attitude
                 sls_offset_params_.latest_pos_enu_ << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
                 latest_attitude_(0) = msg->pose.pose.orientation.w;
                 latest_attitude_(1) = msg->pose.pose.orientation.x;
                 latest_attitude_(2) = msg->pose.pose.orientation.y;
                 latest_attitude_(3) = msg->pose.pose.orientation.z;
 
-                // Rotate Body Frame Twist to World Frame (ENU)
-                Eigen::Quaterniond q_world(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
-                Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
+                Eigen::Vector3d lin_vel(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
+                Eigen::Vector3d ang_vel(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
 
-                Eigen::Vector3d lin_vel_body(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
-                Eigen::Vector3d ang_vel_body(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
-
-                // V_world = R * V_body
-                sls_offset_params_.latest_vel_enu_ = R_body_to_world * lin_vel_body;
-                sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel_body;
+                if (use_sim_) {
+                    // Rotate Body Frame Twist to World Frame (ENU)
+                    Eigen::Quaterniond q_world(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, 
+                                            msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
+                    Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
+                    
+                    sls_offset_params_.latest_vel_enu_ = R_body_to_world * lin_vel;
+                    sls_offset_params_.latest_rate_enu_ = R_body_to_world * ang_vel;
+                } else {
+                    // Vicon provides velocities in world frame, no conversion needed
+                    sls_offset_params_.latest_vel_enu_ = lin_vel;
+                    sls_offset_params_.latest_rate_enu_ = ang_vel;
+                }
 
                 attitude_received_ = true;
             });
-        
-        // if using sim
-        load_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>("/model/px4vision_sls_0/load_odom", rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
-            // Load
+
+        load_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(load_topic, rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+            // RCLCPP_INFO(this->get_logger(), "integral_limit: %f", integral_limit_);::INF
+            // Load Position
             sls_offset_params_.load_pos_enu_ << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
 
-            // Rotate Load Body Frame Twist to World Frame (ENU)
-            // Assuming the load odometry also provides orientation in the pose field
-            Eigen::Quaterniond q_load(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
-            Eigen::Matrix3d R_load_body_to_world = q_load.toRotationMatrix();
+            Eigen::Vector3d lin_vel(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
+            Eigen::Vector3d ang_vel(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
 
-            Eigen::Vector3d lin_vel_body(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
-            Eigen::Vector3d ang_vel_body(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
+            if (use_sim_) {
+                // Rotate Load Body Frame Twist to World Frame (ENU)
+                Eigen::Quaterniond q_load(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, 
+                                        msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
+                Eigen::Matrix3d R_load_body_to_world = q_load.toRotationMatrix();
 
-            sls_offset_params_.load_vel_enu_ = R_load_body_to_world * lin_vel_body;
-            sls_offset_params_.load_rate_enu_ = R_load_body_to_world * ang_vel_body;
+                sls_offset_params_.load_vel_enu_ = R_load_body_to_world * lin_vel;
+                sls_offset_params_.load_rate_enu_ = R_load_body_to_world * ang_vel;
+            } else {
+                // Vicon provides velocities in world frame
+                sls_offset_params_.load_vel_enu_ = lin_vel;
+                sls_offset_params_.load_rate_enu_ = ang_vel;
+            }
 
             sls_offset_params_.load_received_ = true;
         });
-
-        // if using vicon
-        load_vicon_odom_sub_ = this->create_subscription<px4_msgs::msg::VehicleOdometry>("/load/load_odometry", rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
-            // vicon bridge converts to NED, need to convert to ENU
-            sls_offset_params_.load_pos_enu << msg->position.position[1], msg->position.position[0], -msg->position.position[2];
-
-            Eigen::Quaterniond q_load(msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
-            Eigen::Matrix3d R_load_body_to_world = q_load.toRotationMatrix();
-
-            Eigen::Vector3d lin_vel_body(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
-            Eigen::Vector3d ang_vel_body(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
-        }
     }
 
   private:
@@ -273,8 +287,6 @@ class OffboardControl : public rclcpp::Node {
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr vehicle_odometry_subscriber_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr uav_odom_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr load_odom_sub_;
-    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr uav_vicon_odom_sub_;
-    rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr load_vicon_odom_sub_;
 
     // State Variables
     px4_msgs::msg::VehicleLocalPosition latest_local_pos_{};
@@ -297,6 +309,10 @@ class OffboardControl : public rclcpp::Node {
     std::string att_control_type_ = "QSF_offset"; // "Default", "QSF_offset", etc. (For later)
     double kR_;
     double kOmega_;
+
+    // Data Source Toggles
+    bool use_sim_{true};
+    bool use_ekf_{false};
 
     // SLS Offset Gains
     struct sls_offset_params {
@@ -442,6 +458,11 @@ rcl_interfaces::msg::SetParametersResult OffboardControl::parameters_callback(co
             kR_ = param.as_double();
         else if (param.get_name() == "kOmega_")
             kOmega_ = param.as_double();
+
+        else if (param.get_name() == "use_sim")
+            use_sim_ = param.as_bool();
+        else if (param.get_name() == "use_ekf")
+            use_ekf_ = param.as_bool();
 
         else if (param.get_name() == "tau_x_max_")
             sls_offset_params_.tau_x_max_ = param.as_double();
