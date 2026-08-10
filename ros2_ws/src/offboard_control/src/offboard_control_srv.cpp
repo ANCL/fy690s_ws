@@ -1,7 +1,6 @@
 /**
  * @brief Offboard controller
  * @file offboard_control_srv.cpp
- * @author Dion Walton <ddwalton@ualberta.ca>
  */
 
 #include "offboard_control/Inner_loop.h"
@@ -20,6 +19,7 @@
 #include <px4_msgs/msg/vehicle_status.hpp>
 #include <px4_msgs/msg/vehicle_thrust_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_torque_setpoint.hpp>
+
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
 #include <tf2/LinearMath/Matrix3x3.h>
@@ -64,17 +64,17 @@ class OffboardControl : public rclcpp::Node {
         att_control_type_ = this->declare_parameter<std::string>("att_control_type_", "QSF_offset");
 
         // QSF gains
-        sls_offset_params_.Kx_int = this->declare_parameter<double>("Kx_int", 1.0);
-        sls_offset_params_.Kx_pos = this->declare_parameter<double>("Kx_pos", 31.6228);
-        sls_offset_params_.Kx_vel = this->declare_parameter<double>("Kx_vel", 40.9156);
-        sls_offset_params_.Kx_acc = this->declare_parameter<double>("Kx_acc", 24.8885);
-        sls_offset_params_.Kx_jerk = this->declare_parameter<double>("Kx_jerk", 7.7316);
-        sls_offset_params_.Ky_int = this->declare_parameter<double>("Ky_int", 1.0);
-        sls_offset_params_.Ky_pos = this->declare_parameter<double>("Ky_pos", 31.6228);
-        sls_offset_params_.Ky_vel = this->declare_parameter<double>("Ky_vel", 40.9156);
-        sls_offset_params_.Ky_acc = this->declare_parameter<double>("Ky_acc", 24.8885);
-        sls_offset_params_.Ky_jerk = this->declare_parameter<double>("Ky_jerk", 7.7316);
-        sls_offset_params_.Kz_int = this->declare_parameter<double>("Kz_int", 1.0);
+        sls_offset_params_.Kx_int = this->declare_parameter<double>("Kx_int", 10.0000);
+        sls_offset_params_.Kx_pos = this->declare_parameter<double>("Kx_pos", 44.3906);
+        sls_offset_params_.Kx_vel = this->declare_parameter<double>("Kx_vel", 48.5263);
+        sls_offset_params_.Kx_acc = this->declare_parameter<double>("Kx_acc", 27.2053);
+        sls_offset_params_.Kx_jerk = this->declare_parameter<double>("Kx_jerk", 8.0256);
+        sls_offset_params_.Ky_int = this->declare_parameter<double>("Ky_int", 10.0);
+        sls_offset_params_.Ky_pos = this->declare_parameter<double>("Ky_pos", 44.3906);
+        sls_offset_params_.Ky_vel = this->declare_parameter<double>("Ky_vel", 48.5263);
+        sls_offset_params_.Ky_acc = this->declare_parameter<double>("Ky_acc", 27.2053);
+        sls_offset_params_.Ky_jerk = this->declare_parameter<double>("Ky_jerk", 8.0256);
+        sls_offset_params_.Kz_int = this->declare_parameter<double>("Kz_int", 1.0000);
         sls_offset_params_.Kz_pos = this->declare_parameter<double>("Kz_pos", 4.0);
         sls_offset_params_.Kz_vel = this->declare_parameter<double>("Kz_vel", 3.0);
 
@@ -914,7 +914,8 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
 
     double integral_dt[3] = {sls_ned_params.load_pos.x() - pos_des_ned.x(), sls_ned_params.load_pos.y() - pos_des_ned.y(), sls_ned_params.load_pos.z() - pos_des_ned.z()};
     for (int i = 0; i < 3; i++) {
-        if (std::abs(sls_offset_params_.integral[i] + integral_dt[i] * dt_QSF) <= 100) {
+        // only accumulate error if accumulated error <= 100 and we are in offboard mode
+        if (std::abs(sls_offset_params_.integral[i] + integral_dt[i] * dt_QSF) <= 100 && is_offboard_) {
             sls_offset_params_.integral[i] += integral_dt[i] * dt_QSF;
         }
     }

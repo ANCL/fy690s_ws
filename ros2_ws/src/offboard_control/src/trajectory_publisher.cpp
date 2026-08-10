@@ -89,12 +89,14 @@ class TrajectoryPublisher : public rclcpp::Node {
         } else if (flight_path_ == "step") {
             ref = compute_step_reference(-1.5, -1.5, -1.5);
         } else if (flight_path_ == "hover") {
-            ref = compute_step_reference(0.0, 0.0, -1.2);
+            ref = compute_step_reference(0.0, 0.0, -0.5);
         } else if (flight_path_ == "mission") {
             ref = compute_mission_reference(t_sec);
+        } else if (flight_path_ == "setpoints_figure8") {
+            ref = compute_setpoints_figure8_reference(t_sec);
         } else {
             // Default to hover and throttle the warning
-            ref = compute_step_reference(0.0, 0.0, -1.2);
+            ref = compute_step_reference(0.0, 0.0, -0.5);
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Fallback to hover -- '%s' does not exist. Options: hover, step, figure8, circle, helix, mission", flight_path_.c_str());
         }
 
@@ -112,10 +114,10 @@ class TrajectoryPublisher : public rclcpp::Node {
     }
 
     TrajectoryReference compute_figure8_reference(double t_sec) const {
-        const double A = 2.0;
+        const double A = 1.5;
         const double B = 1.0;
         const double omega = 0.4;
-        const double z_ref = -1.2;
+        const double z_ref = -0.5;
 
         const double s = std::sin(omega * t_sec);
         const double c = std::cos(omega * t_sec);
@@ -133,7 +135,7 @@ class TrajectoryPublisher : public rclcpp::Node {
         const double R = 1.0;
         const double omega = 0.4;
         const double x_offset = 0.3;
-        const double z_ref = -1.2;
+        const double z_ref = -0.5;
 
         const double cos_wt = std::cos(omega * t_sec);
         const double sin_wt = std::sin(omega * t_sec);
@@ -177,10 +179,10 @@ class TrajectoryPublisher : public rclcpp::Node {
 
     TrajectoryReference compute_mission_reference(double t_sec) {
         TrajectoryReference ref{};
-        const double z = -1.2;
+        const double z = -0.5;
 
-        ref.velocity = Eigen::Vector3d(NAN, NAN, NAN);
-        ref.acceleration = Eigen::Vector3d(NAN, NAN, NAN);
+        ref.velocity = Eigen::Vector3d(0.0, 0.0, 0.0);
+        ref.acceleration = Eigen::Vector3d(0.0, 0.0, 0.0);
         ref.yaw = 0.0f;
 
         // wrap the time to a 80-second repeating period
@@ -208,6 +210,25 @@ class TrajectoryPublisher : public rclcpp::Node {
         ref.yaw = 0.0f;
 
         return ref;
+    }
+
+    TrajectoryReference compute_setpoints_figure8_reference(double t_sec) {
+        static constexpr double setpoint_time = 15.0; // sec
+
+        if (t_sec < setpoint_time) {
+            return compute_step_reference(0.0, 1.0, -0.5);
+        } else if (t_sec < 2 * setpoint_time) {
+            return compute_step_reference(0.0, -1.0, -0.5);
+        } else if (t_sec < 3 * setpoint_time) {
+            return compute_step_reference(1.0, -1.0, -0.5);
+        } else if (t_sec < 4 * setpoint_time) {
+            return compute_step_reference(0.0, 0.0, -0.7);
+        } else if (t_sec < 4 * setpoint_time + 45.0) {
+            // run for 45 sec
+            return compute_figure8_reference(t_sec - 4 * setpoint_time);
+        } else {
+            return compute_step_reference(0.0, 0.0, -0.5);
+        }
     }
 
     rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr publisher_;

@@ -18,6 +18,12 @@ def generate_launch_description():
         default_value='true',
         description='If true, use Gazebo sim bridges. If false, start Vicon.'
     )
+
+    use_ekf_arg = DeclareLaunchArgument(
+            'use_ekf',
+            default_value='false',
+            description='If true, use EKF2. If false, use groundtrtuth from Gazebo / Vicon.'
+    )
     
     enable_viz_arg = DeclareLaunchArgument(
         'enable_viz',
@@ -60,10 +66,14 @@ def generate_launch_description():
     drone_name_arg = DeclareLaunchArgument('drone_name', default_value='F450_1')
     load_name_arg = DeclareLaunchArgument('load_name', default_value='load_1')
 
+    linear_vel_cutoff_freq_arg = DeclareLaunchArgument('linear_vel_cutoff_freq', default_value='5.0')
+    angular_vel_cutoff_freq_arg = DeclareLaunchArgument('angular_vel_cutoff_freq', default_value='5.0')
+
     # ==========================================
     # GET LAUNCH CONFIGURATIONS
     # ==========================================
     use_sim = LaunchConfiguration('use_sim')
+    use_ekf = LaunchConfiguration('use_ekf')
     enable_viz = LaunchConfiguration('enable_viz')
     control_mode = LaunchConfiguration("control_mode")
     flight_path = LaunchConfiguration("flight_path")
@@ -81,12 +91,16 @@ def generate_launch_description():
     drone_name = LaunchConfiguration('drone_name')
     load_name = LaunchConfiguration('load_name')
 
+    linear_vel_cutoff_freq = LaunchConfiguration('linear_vel_cutoff_freq')
+    angular_vel_cutoff_freq = LaunchConfiguration('angular_vel_cutoff_freq')
+
     # ==========================================
     # RETURN LAUNCH DESCRIPTION
     # ==========================================
     return LaunchDescription([
         # Load arguments
         use_sim_arg,
+        use_ekf_arg,
         enable_viz_arg,
         control_mode_arg,
         flight_path_arg,
@@ -102,6 +116,8 @@ def generate_launch_description():
         map_rpy_in_degrees_arg,
         drone_name_arg,
         load_name_arg,
+        linear_vel_cutoff_freq_arg,
+        angular_vel_cutoff_freq_arg,
 
         # --- Path Visualizer Node (Conditional) ---
         Node(
@@ -120,6 +136,7 @@ def generate_launch_description():
             parameters=[{
                 "control_mode": control_mode,
                 "use_sim": use_sim,      # Passed directly to the C++ node
+                "use_ekf": use_ekf,
                 "Kp": kp,
                 "Kv": kv
             }],
@@ -188,8 +205,8 @@ def generate_launch_description():
                 'odom_load_topic': ['/', topic_namespace, '/', load_name, '/odom'],
                 'px4_ev_topic': '/fmu/in/vehicle_visual_odometry',
                 'use_header_stamp': True,
-                'linear_velocity_lowpass_cutoff_hz': 5.0,
-                'angular_velocity_lowpass_cutoff_hz': 5.0,
+                'linear_velocity_lowpass_cutoff_hz': linear_vel_cutoff_freq,
+                'angular_velocity_lowpass_cutoff_hz': angular_vel_cutoff_freq,
                 'max_sample_interval_s': 0.1
             }]
         )

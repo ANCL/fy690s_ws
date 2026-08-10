@@ -8,6 +8,9 @@ def generate_launch_description():
     flight_path = LaunchConfiguration("flight_path")
     kp = LaunchConfiguration("Kp")
     kv = LaunchConfiguration("Kv")
+    use_sim = LaunchConfiguration('use_sim')
+    use_ekf = LaunchConfiguration('use_ekf')
+
 
     control_mode_arg = DeclareLaunchArgument(
         "control_mode",
@@ -33,12 +36,27 @@ def generate_launch_description():
         description="Velocity gain for the acceleration controller"
     )
 
+    use_sim_arg = DeclareLaunchArgument(
+        'use_sim',
+        default_value='true',
+        description='If true, use Gazebo sim bridges. If false, start Vicon.'
+    )
+    
+    use_ekf_arg = DeclareLaunchArgument(
+        'use_ekf',
+        default_value='false',
+        description='If true, use EKF2. If false, use groundtrtuth from Gazebo / Vicon.'
+    )
+    
+
     offboard_control_node = Node(
         package="offboard_control",
         executable="offboard_control_srv",
         output="screen",
         parameters=[{
             "control_mode": control_mode,
+            "use_sim": use_sim,
+            "use_ekf": use_ekf,
             "Kp": kp,
             "Kv": kv
         }],
@@ -55,6 +73,8 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        use_sim_arg,
+        use_ekf_arg,
         control_mode_arg,
         flight_path_arg,
         kp_arg,

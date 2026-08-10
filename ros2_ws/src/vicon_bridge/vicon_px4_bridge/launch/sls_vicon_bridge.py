@@ -20,6 +20,10 @@ def generate_launch_description():
     drone_name_arg = DeclareLaunchArgument('drone_name', default_value='F450_1')
     load_name_arg = DeclareLaunchArgument('load_name', default_value='load_1')
 
+    # --- Filter Arguments ---
+    linear_vel_cutoff_freq_arg = DeclareLaunchArgument('linear_vel_cutoff_freq', default_value='5.0')
+    angular_vel_cutoff_freq_arg = DeclareLaunchArgument('angular_vel_cutoff_freq', default_value='5.0')
+
     # --- Launch Configurations ---
     hostname = LaunchConfiguration('hostname')
     buffer_size = LaunchConfiguration('buffer_size')
@@ -32,6 +36,9 @@ def generate_launch_description():
     
     drone_name = LaunchConfiguration('drone_name')
     load_name = LaunchConfiguration('load_name')
+    
+    linear_vel_cutoff_freq = LaunchConfiguration('linear_vel_cutoff_freq')
+    angular_vel_cutoff_freq = LaunchConfiguration('angular_vel_cutoff_freq')
 
     return LaunchDescription([
         hostname_arg,
@@ -44,6 +51,8 @@ def generate_launch_description():
         map_rpy_in_degrees_arg,
         drone_name_arg,
         load_name_arg,
+        linear_vel_cutoff_freq_arg,
+        angular_vel_cutoff_freq_arg,
 
         # --- Vicon Receiver Node ---
         Node(
@@ -82,8 +91,8 @@ def generate_launch_description():
                 
                 # Filter config settings
                 'use_header_stamp': True,
-                'linear_velocity_lowpass_cutoff_hz': 5.0,
-                'angular_velocity_lowpass_cutoff_hz': 5.0,
+                'linear_velocity_lowpass_cutoff_hz': linear_vel_cutoff_freq,
+                'angular_velocity_lowpass_cutoff_hz': angular_vel_cutoff_freq,
                 'max_sample_interval_s': 0.1
             }]
         )
