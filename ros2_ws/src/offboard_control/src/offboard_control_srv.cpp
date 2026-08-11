@@ -914,9 +914,12 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
 
     double integral_dt[3] = {sls_ned_params.load_pos.x() - pos_des_ned.x(), sls_ned_params.load_pos.y() - pos_des_ned.y(), sls_ned_params.load_pos.z() - pos_des_ned.z()};
     for (int i = 0; i < 3; i++) {
-        // only accumulate error if accumulated error <= 100 and we are in offboard mode
-        if (std::abs(sls_offset_params_.integral[i] + integral_dt[i] * dt_QSF) <= 100 && is_offboard_) {
+        // only accumulate error if accumulated error <= 100
+        if (std::abs(sls_offset_params_.integral[i] + integral_dt[i] * dt_QSF) <= 100) {
             sls_offset_params_.integral[i] += integral_dt[i] * dt_QSF;
+
+            // reset integral if not in offboard mode
+            if (!is_offboard_) sls_offset_params_.integral[i] = 0.0;
         }
     }
 
