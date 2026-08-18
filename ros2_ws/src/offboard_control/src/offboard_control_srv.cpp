@@ -136,11 +136,12 @@ class OffboardControl : public rclcpp::Node {
                 pos_received_ = true;
 
                 publish_offboard_control_mode();
-
-                if (control_mode_ == "se3") {
-                    publish_se3_attitude_setpoint();
-                } else {
-                    publish_trajectory_setpoint();
+                if (is_offboard_) {
+                    if (control_mode_ == "se3") {
+                        publish_se3_attitude_setpoint();
+                    } else {
+                        publish_trajectory_setpoint();
+                    }
                 }
             });
 
@@ -158,10 +159,7 @@ class OffboardControl : public rclcpp::Node {
                 if (is_offboard_ && !was_offboard) {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode engaged.");
                     start_time_ = this->now();
-                    // reset integral terms when entering offboard mode
-                    for (int i = 0; i < 3; i++) {
-                        sls_offset_params_.integral[i] = 0.0;
-                    }
+                    reset_integral_ = true; // Reset integral when entering offboard mode
                 } else if (!is_offboard_ && was_offboard) {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode disengaged.");
                 }
@@ -171,6 +169,10 @@ class OffboardControl : public rclcpp::Node {
         vehicle_odometry_subscriber_ =
             this->create_subscription<px4_msgs::msg::VehicleOdometry>("/fmu/out/vehicle_odometry", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
                 if (!use_ekf_) return; // ignore if relying on external vision
+                if (std::isnan(msg->q[0]) || std::isnan(msg->velocity[0])) {
+                    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "VehicleOdometry contains NaN. EKF not ready.");
+                    return;
+                }
 
                 // When frame == 1, it is in NED
                 if ((msg->pose_frame != 1) || (msg->velocity_frame != 1)) {
@@ -195,6 +197,7 @@ class OffboardControl : public rclcpp::Node {
 
                 // Rotate Body Frame Twist to World Frame (ENU)
                 Eigen::Quaterniond q_world(latest_attitude_(0), latest_attitude_(1), latest_attitude_(2), latest_attitude_(3));
+                q_world.normalize();
                 Eigen::Matrix3d R_body_to_world = q_world.toRotationMatrix();
 
                 // Convert FRD body rates to FLU body rates (invert Y and Z)
@@ -309,6 +312,7 @@ class OffboardControl : public rclcpp::Node {
     // Data Source Toggles
     bool use_sim_{true};
     bool use_ekf_{false};
+    bool reset_integral_{false};
 
     // SLS Offset Gains
     struct sls_offset_params {
@@ -621,10 +625,10 @@ void OffboardControl::publish_trajectory_setpoint() {
         msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
         msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
     } else {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Unknown control_mode '%s', falling back to position mode", control_mode_.c_str());
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Unknown control_mode '%s', falling back to full mode", control_mode_.c_str());
         msg.position = {static_cast<float>(p_ref.x()), static_cast<float>(p_ref.y()), static_cast<float>(p_ref.z())};
-        msg.velocity = {NAN, NAN, NAN};
-        msg.acceleration = {NAN, NAN, NAN};
+        msg.velocity = {static_cast<float>(v_ref.x()), static_cast<float>(v_ref.y()), static_cast<float>(v_ref.z())};
+        msg.acceleration = {static_cast<float>(a_ref.x()), static_cast<float>(a_ref.y()), static_cast<float>(a_ref.z())};
     }
 
     trajectory_setpoint_publisher_->publish(msg);
@@ -930,8 +934,11 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
         }
 
         // reset integral if not in offboard mode
-        if (!is_offboard_) sls_offset_params_.integral[i] = 0.0;
+        if (reset_integral_) {
+            sls_offset_params_.integral[i] = 0.0;
+        }
     }
+    reset_integral_ = false;
 
     // Save data
     // Filled column-wise, see codegen for reason
@@ -996,11 +1003,12 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
                rate_sp_dt, eI_dt);
     
     // reset integral if not in offboard mode or attitude not received
-    if (!is_offboard_ || !attitude_received_) {
+    if (reset_integral_) {
         for (int i = 0; i < 3; i++) {
             eI[i] = 0.0;
         }
         first_call_inner_loop_ = true;
+        reset_integral_ = false;
     } else {
         for(int i = 0; i < 3; i++) {
             if (std::isfinite(eI_dt[i])) {
