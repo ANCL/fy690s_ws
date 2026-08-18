@@ -11,7 +11,6 @@
 #include <nav_msgs/msg/odometry.hpp> 
 #include <px4_msgs/msg/offboard_control_mode.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
-#include <px4_msgs/msg/vehicle_attitude.hpp>
 #include <px4_msgs/msg/vehicle_attitude_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_local_position.hpp>
 #include <px4_msgs/msg/vehicle_odometry.hpp>
@@ -47,7 +46,7 @@ using namespace px4_msgs::msg;
 class OffboardControl : public rclcpp::Node {
   public:
     OffboardControl(std::string px4_namespace)
-        : Node("offboard_control_srv"), control_mode_("position"), kp_(2.0), kv_(1.5), mass_(2.0232), // make sure mass & hover thrust are defined
+        : Node("offboard_control_srv"), control_mode_("position"), kp_(2.0), kv_(1.5), mass_(2.093), // make sure mass & hover thrust are defined
                                                                                                       // before using the se3 controller
           hover_thrust_(0.5) {
         // Declare Parameters
@@ -89,13 +88,24 @@ class OffboardControl : public rclcpp::Node {
         RCLCPP_INFO(this->get_logger(), "Using EKF: %s", use_ekf_ ? "TRUE" : "FALSE");
 
         // Geometric controller gains
-        kR_ = this->declare_parameter<double>("kR_", 5.0);
-        kOmega_ = this->declare_parameter<double>("kOmega_", 0.8);
+        // 0 < cI < min(sqrt(kR/Iqxx)/Iqzz, 4*kR*kOmega/(4*kR*Iqzz + kOmega^2))
+        kR_ = this->declare_parameter<double>("kR_", 2.5);
+        kOmega_ = this->declare_parameter<double>("kOmega_", 0.35);
+        kI_ = this->declare_parameter<double>("kI_", 0.1);
+        cI_ = this->declare_parameter<double>("cI_", 0.01); 
+
+         // Inertia matrix parameters
+        sls_offset_params_.Iqxx = this->declare_parameter<double>("Iqxx", 0.020653500000000005);
+        sls_offset_params_.Iqyy = this->declare_parameter<double>("Iqyy", 0.020653500000000005);
+        sls_offset_params_.Iqzz = this->declare_parameter<double>("Iqzz", 0.04046400000000001);
+        // double Iqxx = 0.02091; // experiment values
+        // double Iqyy = 0.02091;
+        // double Iqzz = 0.02934;
 
         // SLS offset Max torque
-        sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 2.21356);
-        sls_offset_params_.tau_y_max_ = this->declare_parameter<double>("tau_y_max_", 1.93429);
-        sls_offset_params_.tau_z_max_ = this->declare_parameter<double>("tau_z_max_", 1.24125);
+        sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356);
+        sls_offset_params_.tau_y_max_ = this->declare_parameter<double>("tau_y_max_", 4.15*2.21356);
+        sls_offset_params_.tau_z_max_ = this->declare_parameter<double>("tau_z_max_", 2.5);
 
         // Initialize gain matrices
         K_p_ = kp_ * Eigen::Matrix3d::Identity();
@@ -125,18 +135,12 @@ class OffboardControl : public rclcpp::Node {
                 latest_local_pos_ = *msg;
                 pos_received_ = true;
 
-                // Event-Driven Control Execution
-                if (is_offboard_) {
-                    publish_offboard_control_mode();
-                    if (control_mode_ == "se3") {
-                        publish_se3_attitude_setpoint();
-                    } else {
-                        publish_trajectory_setpoint();
-                    }
+                publish_offboard_control_mode();
+
+                if (control_mode_ == "se3") {
+                    publish_se3_attitude_setpoint();
                 } else {
-                    // still need to publish control mode at >2Hz to allow
-                    // arming/switching
-                    publish_offboard_control_mode();
+                    publish_trajectory_setpoint();
                 }
             });
 
@@ -154,22 +158,13 @@ class OffboardControl : public rclcpp::Node {
                 if (is_offboard_ && !was_offboard) {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode engaged.");
                     start_time_ = this->now();
+                    // reset integral terms when entering offboard mode
+                    for (int i = 0; i < 3; i++) {
+                        sls_offset_params_.integral[i] = 0.0;
+                    }
                 } else if (!is_offboard_ && was_offboard) {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode disengaged.");
                 }
-            });
-        
-        // Should probably get rid of this if not necessary
-        vehicle_attitude_subscriber_ =
-            this->create_subscription<px4_msgs::msg::VehicleAttitude>("/fmu/out/vehicle_attitude", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleAttitude::SharedPtr msg) {
-                // This is the ONBOARD EKF2 estimator
-                // Eigen::Quaterniond q_ned(msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
-                // Eigen::Quaterniond q_enu = px4_ros_com::frame_transforms::px4_to_ros_orientation(q_ned);
-                // latest_attitude_(0) = q_enu.w();
-                // latest_attitude_(1) = q_enu.x();
-                // latest_attitude_(2) = q_enu.y();
-                // latest_attitude_(3) = q_enu.z();
-                // attitude_received_ = true;
             });
 
         // use FMU odometry
@@ -283,7 +278,6 @@ class OffboardControl : public rclcpp::Node {
     rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr vehicle_local_position_subscriber_;
     rclcpp::Subscription<TrajectorySetpoint>::SharedPtr trajectory_ref_subscriber_;
     rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_subscriber_;
-    rclcpp::Subscription<px4_msgs::msg::VehicleAttitude>::SharedPtr vehicle_attitude_subscriber_;
     rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr vehicle_odometry_subscriber_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr uav_odom_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr load_odom_sub_;
@@ -309,6 +303,8 @@ class OffboardControl : public rclcpp::Node {
     std::string att_control_type_ = "QSF_offset"; // "Default", "QSF_offset", etc. (For later)
     double kR_;
     double kOmega_;
+    double kI_;
+    double cI_;
 
     // Data Source Toggles
     bool use_sim_{true};
@@ -323,10 +319,10 @@ class OffboardControl : public rclcpp::Node {
         // SLS offset parameters and state variables
         Eigen::Vector3d latest_pos_enu_{}, latest_vel_enu_{}, latest_rate_enu_{}, load_pos_enu_{}, load_vel_enu_{}, load_rate_enu_{}, pend_rate_enu_{}, pend_angle_enu_{}, latest_rate_frd_{};
         bool load_received_{false};
-        double load_mass_ = 0.3; // kg
+        double load_mass_ = 0.3; //0.191; // kg
         double R_bi[9];
         Eigen::Matrix3d R_Bd;                      // Desired UAV attitude
-        double l = 0.75;                           // Cable length
+        double l = 0.75; // 0.92;                           // Cable length
         //double L_offset_[3] = {0.12, -0.12, 0.06}; // Offset of load from UAV in meters (FRD) (x, -y, -z)
         double L_offset_[3] = {0.0, 0.0, 0.0};
         double phi_rad_, theta_rad_, psi_rad_;
@@ -345,6 +341,8 @@ class OffboardControl : public rclcpp::Node {
         double dOmegad1 = 0.0, dOmegad2 = 0.0, dOmegad3 = 0.0;
         double ddR1 = 0.0, ddR2 = 0.0, ddR3 = 0.0;
         double integral[3] = {0.0, 0.0, 0.0};
+        
+
         double Iqxx = 0.020653500000000005; // 0.029125;
         double Iqyy = 0.020653500000000005; // 0.029125;
         double Iqzz = 0.04046400000000001;  // 0.055225;
@@ -458,6 +456,17 @@ rcl_interfaces::msg::SetParametersResult OffboardControl::parameters_callback(co
             kR_ = param.as_double();
         else if (param.get_name() == "kOmega_")
             kOmega_ = param.as_double();
+        else if (param.get_name() == "kI_")
+            kI_ = param.as_double();
+        else if (param.get_name() == "cI_")
+            cI_ = param.as_double();
+
+        else if (param.get_name() == "Iqxx")
+            sls_offset_params_.Iqxx = param.as_double();
+        else if (param.get_name() == "Iqyy")
+            sls_offset_params_.Iqyy = param.as_double();
+        else if (param.get_name() == "Iqzz")
+            sls_offset_params_.Iqzz = param.as_double();
 
         else if (param.get_name() == "use_sim")
             use_sim_ = param.as_bool();
@@ -909,7 +918,7 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
     // Update integral
     static rclcpp::Time last_time_QSF = this->get_clock()->now();
     const rclcpp::Time now_QSF = this->get_clock()->now();
-    double dt_QSF = (now_QSF - last_time_QSF).seconds();
+    double dt_QSF = std::clamp((now_QSF - last_time_QSF).seconds(), 0.001, 0.05); // clamp dt_QSF to [1ms, 25ms] to avoid large dt if the loop is delayed
     last_time_QSF = now_QSF;
 
     double integral_dt[3] = {sls_ned_params.load_pos.x() - pos_des_ned.x(), sls_ned_params.load_pos.y() - pos_des_ned.y(), sls_ned_params.load_pos.z() - pos_des_ned.z()};
@@ -918,9 +927,10 @@ std::tuple<Eigen::Vector4d, std::pair<Eigen::Vector3d, double>, Eigen::Vector3d>
         if (std::abs(sls_offset_params_.integral[i] + integral_dt[i] * dt_QSF) <= 100) {
             sls_offset_params_.integral[i] += integral_dt[i] * dt_QSF;
 
-            // reset integral if not in offboard mode
-            if (!is_offboard_) sls_offset_params_.integral[i] = 0.0;
         }
+
+        // reset integral if not in offboard mode
+        if (!is_offboard_) sls_offset_params_.integral[i] = 0.0;
     }
 
     // Save data
@@ -957,19 +967,49 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
     double dOmegad[3] = {sls_offset_params_.dOmegad1, sls_offset_params_.dOmegad2, sls_offset_params_.dOmegad3};
     double ddxi_flat[3] = {mass_ * sls_offset_params_.ddR1, mass_ * sls_offset_params_.ddR2, mass_ * sls_offset_params_.ddR3}; // for QSF diff_flat
     double rpy_angles[3] = {sls_offset_params_.phi_rad_, sls_offset_params_.theta_rad_, sls_offset_params_.psi_rad_};
-    double gains[2] = {kR_, kOmega_};
+    double gains[4] = {kR_, kOmega_, kI_, cI_};
     double physics_parameters[6] = {mass_, sls_offset_params_.load_mass_, gravity_, sls_offset_params_.Iqxx, sls_offset_params_.Iqyy, sls_offset_params_.Iqzz};
     double load_acc[3] = {sls_offset_params_.ddxp, sls_offset_params_.ddyp, sls_offset_params_.ddzp};
-    double taub[3], tau[3], rate_sp_dt[3];
+    double taub[3], tau[3], rate_sp_dt[3]; 
+    
+    // integral paramaters
+    static double eI[3] = {0.0, 0.0, 0.0}; // integral state input
+    static double eI_dt[3] = {0.0, 0.0, 0.0}; // derivative of integral state input
 
-    Inner_loop(rpy_angles, Omega, sls_offset_params_.R_Bd.data(), Omegad, dOmegad, -mass_ * thrust_command, gains, physics_parameters, sls_offset_params_.L_offset_, ddxi_flat, load_acc, taub, tau,
-               rate_sp_dt);
-    /*
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 250,
-                         "[InnerLoop] Omega(NED): [%.2f, %.2f, %.2f] | Omegad: [%.2f, %.2f, %.2f]\n"
-                         "            Raw taub: [%.2f, %.2f, %.2f] | Thrust: %.3f",
-                         Omega[0], Omega[1], Omega[2], Omegad[0], Omegad[1], Omegad[2], taub[0], taub[1], taub[2], thrust_command);
-    */
+    static bool first_call_inner_loop_ = true;
+    static rclcpp::Time last_called_inner_loop_ = this->get_clock()->now();
+    double dt = 0.0;
+
+    if (first_call_inner_loop_) {
+        first_call_inner_loop_ = false;
+        last_called_inner_loop_ = this->get_clock()->now();
+    } else {
+        rclcpp::Time now = this->get_clock()->now();
+        dt = (now - last_called_inner_loop_).seconds();
+        last_called_inner_loop_ = now;
+    }
+
+    // removed ddxi_flat from inner loop call since it is not used in the function
+    Inner_loop(rpy_angles, Omega, sls_offset_params_.R_Bd.data(), Omegad, dOmegad, 
+               -mass_ * thrust_command, gains, physics_parameters, 
+               sls_offset_params_.L_offset_, load_acc, eI, taub, tau,
+               rate_sp_dt, eI_dt);
+    
+    // reset integral if not in offboard mode or attitude not received
+    if (!is_offboard_ || !attitude_received_) {
+        for (int i = 0; i < 3; i++) {
+            eI[i] = 0.0;
+        }
+        first_call_inner_loop_ = true;
+    } else {
+        for(int i = 0; i < 3; i++) {
+            if (std::isfinite(eI_dt[i])) {
+                // clamp integral state to [-10, 10] to prevent too much windup
+                eI[i] = std::clamp(eI[i] + (eI_dt[i] * dt), -10.0, 10.0);
+            }
+        }
+    }
+
     // Normalize tau for torque and thrust setpoint to [-1, 1]
     tau[0] = std::clamp(tau[0] / sls_offset_params_.tau_x_max_, -1.0, 1.0);
     tau[1] = std::clamp(tau[1] / sls_offset_params_.tau_y_max_, -1.0, 1.0);

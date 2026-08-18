@@ -14,9 +14,11 @@ find_package(tf2 REQUIRED)
 # =========================================================================
 # Build Libraries
 # =========================================================================
-add_library(sls_qsf 
+add_library(sls_qsf
     # QSF offset controllers
     src/Inner_loop/Inner_loop.cpp
+    src/Inner_loop/diag.cpp
+    src/Inner_loop/mldivide.cpp
     src/QSF_w_offset_intctrl_U/QSF_w_offset_intctrl_U.cpp
     src/QSF_w_offset_intctrl_U/rt_nonfinite.cpp
     src/QSF_w_offset_intctrl_U/rtGetInf.cpp
