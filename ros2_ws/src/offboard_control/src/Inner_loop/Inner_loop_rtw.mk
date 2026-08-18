@@ -2,7 +2,7 @@
 ## Makefile generated for component 'Inner_loop'. 
 ## 
 ## Makefile     : Inner_loop_rtw.mk
-## Generated on : Mon Jan 19 13:23:29 2026
+## Generated on : Mon Aug 17 21:58:30 2026
 ## Final product: .\Inner_loop.lib
 ## Product type : static-library
 ## 
@@ -21,10 +21,10 @@
 
 PRODUCT_NAME              = Inner_loop
 MAKEFILE                  = Inner_loop_rtw.mk
-MATLAB_ROOT               = C:\PROGRA~1\MATLAB\R2024a
-MATLAB_BIN                = C:\PROGRA~1\MATLAB\R2024a\bin
+MATLAB_ROOT               = C:\PROGRA~1\MATLAB\R2024b
+MATLAB_BIN                = C:\PROGRA~1\MATLAB\R2024b\bin
 MATLAB_ARCH_BIN           = $(MATLAB_BIN)\win64
-START_DIR                 = Z:\ros2\QCSP_offset - ROS2\ode89\inner_v2
+START_DIR                 = Z:\ros2\QCSP_offset - ROS2\ode89\Inner_v3
 TGT_FCN_LIB               = ISO_C++11
 SOLVER_OBJ                = 
 CLASSIC_INTERFACE         = 0
@@ -43,7 +43,7 @@ MODELLIB                  = Inner_loop.lib
 
 # Toolchain Name:          Microsoft Visual C++ 2022 v17.0 | nmake (64-bit Windows)
 # Supported Version(s):    17.0
-# ToolchainInfo Version:   2024a
+# ToolchainInfo Version:   2024b
 # Specification Revision:  1.0
 # 
 #-------------------------------------------
@@ -182,7 +182,7 @@ DEFINES = $(DEFINES_CUSTOM) $(DEFINES_STANDARD)
 ## SOURCE FILES
 ###########################################################################
 
-SRCS = $(START_DIR)\codegen\lib\Inner_loop\Inner_loop_initialize.cpp $(START_DIR)\codegen\lib\Inner_loop\Inner_loop_terminate.cpp $(START_DIR)\codegen\lib\Inner_loop\Inner_loop.cpp
+SRCS = $(START_DIR)\codegen\lib\Inner_loop\Inner_loop_initialize.cpp $(START_DIR)\codegen\lib\Inner_loop\Inner_loop_terminate.cpp $(START_DIR)\codegen\lib\Inner_loop\Inner_loop.cpp $(START_DIR)\codegen\lib\Inner_loop\diag.cpp $(START_DIR)\codegen\lib\Inner_loop\mldivide.cpp
 
 ALL_SRCS = $(SRCS)
 
@@ -190,7 +190,7 @@ ALL_SRCS = $(SRCS)
 ## OBJECTS
 ###########################################################################
 
-OBJS = Inner_loop_initialize.obj Inner_loop_terminate.obj Inner_loop.obj
+OBJS = Inner_loop_initialize.obj Inner_loop_terminate.obj Inner_loop.obj diag.obj mldivide.obj
 
 ALL_OBJS = $(OBJS)
 
@@ -292,67 +292,67 @@ $(PRODUCT) : $(OBJS) $(PREBUILT_OBJS)
 # SOURCE-TO-OBJECT
 #---------------------
 
-.c.obj :
+.c.obj:
 	$(CC) $(CFLAGS) -Fo"$@" "$<"
 
 
-.cpp.obj :
+.cpp.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-.cc.obj :
+.cc.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-.cxx.obj :
+.cxx.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-{$(RELATIVE_PATH_TO_ANCHOR)}.c.obj :
+{$(RELATIVE_PATH_TO_ANCHOR)}.c.obj:
 	$(CC) $(CFLAGS) -Fo"$@" "$<"
 
 
-{$(RELATIVE_PATH_TO_ANCHOR)}.cpp.obj :
+{$(RELATIVE_PATH_TO_ANCHOR)}.cpp.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-{$(RELATIVE_PATH_TO_ANCHOR)}.cc.obj :
+{$(RELATIVE_PATH_TO_ANCHOR)}.cc.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-{$(RELATIVE_PATH_TO_ANCHOR)}.cxx.obj :
+{$(RELATIVE_PATH_TO_ANCHOR)}.cxx.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-{$(START_DIR)\codegen\lib\Inner_loop}.c.obj :
+{$(START_DIR)\codegen\lib\Inner_loop}.c.obj:
 	$(CC) $(CFLAGS) -Fo"$@" "$<"
 
 
-{$(START_DIR)\codegen\lib\Inner_loop}.cpp.obj :
+{$(START_DIR)\codegen\lib\Inner_loop}.cpp.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-{$(START_DIR)\codegen\lib\Inner_loop}.cc.obj :
+{$(START_DIR)\codegen\lib\Inner_loop}.cc.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-{$(START_DIR)\codegen\lib\Inner_loop}.cxx.obj :
+{$(START_DIR)\codegen\lib\Inner_loop}.cxx.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-{$(START_DIR)}.c.obj :
+{$(START_DIR)}.c.obj:
 	$(CC) $(CFLAGS) -Fo"$@" "$<"
 
 
-{$(START_DIR)}.cpp.obj :
+{$(START_DIR)}.cpp.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-{$(START_DIR)}.cc.obj :
+{$(START_DIR)}.cc.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
-{$(START_DIR)}.cxx.obj :
+{$(START_DIR)}.cxx.obj:
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$<"
 
 
@@ -366,6 +366,14 @@ Inner_loop_terminate.obj : "$(START_DIR)\codegen\lib\Inner_loop\Inner_loop_termi
 
 Inner_loop.obj : "$(START_DIR)\codegen\lib\Inner_loop\Inner_loop.cpp"
 	$(CPP) $(CPPFLAGS) -Fo"$@" "$(START_DIR)\codegen\lib\Inner_loop\Inner_loop.cpp"
+
+
+diag.obj : "$(START_DIR)\codegen\lib\Inner_loop\diag.cpp"
+	$(CPP) $(CPPFLAGS) -Fo"$@" "$(START_DIR)\codegen\lib\Inner_loop\diag.cpp"
+
+
+mldivide.obj : "$(START_DIR)\codegen\lib\Inner_loop\mldivide.cpp"
+	$(CPP) $(CPPFLAGS) -Fo"$@" "$(START_DIR)\codegen\lib\Inner_loop\mldivide.cpp"
 
 
 ###########################################################################

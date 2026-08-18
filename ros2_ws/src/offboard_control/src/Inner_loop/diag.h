@@ -2,26 +2,29 @@
 // Academic License - for use in teaching, academic research, and meeting
 // course requirements at degree granting institutions only.  Not for
 // government, commercial, or other organizational use.
-// File: Inner_loop_terminate.cpp
+// File: diag.h
 //
 // MATLAB Coder version            : 24.2
 // C/C++ source code generated on  : 17-Aug-2026 21:58:17
 //
 
-// Include Files
-#include "Inner_loop_terminate.h"
+#ifndef DIAG_H
+#define DIAG_H
 
-// Function Definitions
-//
-// Arguments    : void
-// Return Type  : void
-//
-void Inner_loop_terminate()
-{
+// Include Files
+#include "rtwtypes.h"
+#include <cstddef>
+#include <cstdlib>
+
+// Function Declarations
+namespace coder {
+void diag(const double v[3], double d[9]);
+
 }
 
+#endif
 //
-// File trailer for Inner_loop_terminate.cpp
+// File trailer for diag.h
 //
 // [EOF]
 //

@@ -2,374 +2,368 @@
 // Academic License - for use in teaching, academic research, and meeting
 // course requirements at degree granting institutions only.  Not for
 // government, commercial, or other organizational use.
+// File: Inner_loop.cpp
 //
-// Inner_loop.cpp
-//
-// Code generation for function 'Inner_loop'
+// MATLAB Coder version            : 24.2
+// C/C++ source code generated on  : 17-Aug-2026 21:58:17
 //
 
-// Include files
+// Include Files
 #include "Inner_loop.h"
+#include "diag.h"
+#include "mldivide.h"
 #include <cmath>
 #include <emmintrin.h>
 
 // Function Definitions
+//
+// extract
+//
+// Arguments    : const double rpy_angles[3]
+//                const double Omega[3]
+//                const double Rd[9]
+//                const double Omegad[3]
+//                const double dOmegad[3]
+//                double Fl
+//                const double gains[4]
+//                const double physics_param[6]
+//                const double L_offset[3]
+//                const double load_acc[3]
+//                const double eI[3]
+//                double taub[3]
+//                double tau[3]
+//                double rate_sp_dt[3]
+//                double eI_dt[3]
+// Return Type  : void
+//
 void Inner_loop(const double rpy_angles[3], const double Omega[3],
                 const double Rd[9], const double Omegad[3],
-                const double dOmegad[3], double Fl, const double gains[2],
+                const double dOmegad[3], double Fl, const double gains[4],
                 const double physics_param[6], const double L_offset[3],
-                const double ddxi_flat[3], const double load_acc[3],
-                double taub[3], double tau[3], double rate_sp[3])
+                const double load_acc[3], const double eI[3], double taub[3],
+                double tau[3], double rate_sp_dt[3], double eI_dt[3])
 {
-  __m128d b_r2;
-  __m128d b_r3;
   __m128d r;
   __m128d r1;
   double J[9];
   double R[9];
+  double SOmega_tmp[9];
+  double b_physics_param[9];
   double eR_raw[9];
   double eR_raw_tmp[9];
   double eR_raw_tmp_tmp[9];
   double F[3];
-  double b_Omega[3];
-  double b_gains[3];
+  double b[3];
+  double b_F[3];
   double b_y[3];
-  double c_Omega[3];
-  double c_y[3];
-  double dv[3];
+  double eR[3];
   double y[3];
-  double J_tmp;
   double R_tmp;
-  double a21;
-  double b_J_tmp;
   double b_R_tmp;
+  double c_R_tmp;
   double d;
   double d1;
   double d2;
-  double ddxi_idx_0;
-  double ddxi_idx_1;
-  double ddxi_idx_2;
-  double maxval;
-  int b_r1;
-  int r2;
-  int r3;
-  int rtemp;
-  //  extract
-  a21 = std::cos(rpy_angles[1]);
-  maxval = std::sin(rpy_angles[1]);
-  ddxi_idx_0 = std::cos(rpy_angles[2]);
-  ddxi_idx_1 = std::sin(rpy_angles[2]);
-  R_tmp = std::cos(rpy_angles[0]);
-  ddxi_idx_2 = std::sin(rpy_angles[0]);
-  R[0] = a21 * ddxi_idx_0;
-  R[1] = a21 * ddxi_idx_1;
-  R[2] = -maxval;
-  b_R_tmp = ddxi_idx_2 * maxval;
-  R[3] = b_R_tmp * ddxi_idx_0 - R_tmp * ddxi_idx_1;
-  R[4] = b_R_tmp * ddxi_idx_1 + R_tmp * ddxi_idx_0;
-  R[5] = ddxi_idx_2 * a21;
-  maxval *= R_tmp;
-  R[6] = maxval * ddxi_idx_0 + ddxi_idx_2 * ddxi_idx_1;
-  R[7] = maxval * ddxi_idx_1 - ddxi_idx_2 * ddxi_idx_0;
-  R[8] = R_tmp * a21;
+  double d3;
+  double d_R_tmp;
+  double e_R_tmp;
+  double f_R_tmp;
+  double g_R_tmp;
+  int F_tmp;
+  R_tmp = std::cos(rpy_angles[1]);
+  b_R_tmp = std::sin(rpy_angles[1]);
+  c_R_tmp = std::cos(rpy_angles[2]);
+  d_R_tmp = std::sin(rpy_angles[2]);
+  e_R_tmp = std::sin(rpy_angles[0]);
+  f_R_tmp = std::cos(rpy_angles[0]);
+  R[0] = R_tmp * c_R_tmp;
+  R[1] = R_tmp * d_R_tmp;
+  R[2] = -b_R_tmp;
+  g_R_tmp = e_R_tmp * b_R_tmp;
+  R[3] = g_R_tmp * c_R_tmp - f_R_tmp * d_R_tmp;
+  R[4] = g_R_tmp * d_R_tmp + f_R_tmp * c_R_tmp;
+  R[5] = e_R_tmp * R_tmp;
+  b_R_tmp *= f_R_tmp;
+  R[6] = b_R_tmp * c_R_tmp + e_R_tmp * d_R_tmp;
+  R[7] = b_R_tmp * d_R_tmp - e_R_tmp * c_R_tmp;
+  R[8] = f_R_tmp * R_tmp;
   //  Rbi
-  a21 = L_offset[2] * L_offset[2];
-  maxval = L_offset[1] * L_offset[1];
-  J[0] = (maxval + a21) * physics_param[0] + physics_param[3];
-  J_tmp = -physics_param[0] * L_offset[0];
-  b_J_tmp = J_tmp * L_offset[1];
-  J[3] = b_J_tmp;
-  J_tmp *= L_offset[2];
-  J[6] = J_tmp;
-  J[1] = b_J_tmp;
-  ddxi_idx_0 = L_offset[0] * L_offset[0];
-  J[4] = physics_param[4] + physics_param[0] * (ddxi_idx_0 + a21);
-  a21 = -physics_param[0] * L_offset[1] * L_offset[2];
-  J[7] = a21;
-  J[2] = J_tmp;
-  J[5] = a21;
-  J[8] = physics_param[5] + physics_param[0] * (ddxi_idx_0 + maxval);
+  R_tmp = L_offset[2] * L_offset[2];
+  b_R_tmp = L_offset[1] * L_offset[1];
+  J[0] = (b_R_tmp + R_tmp) * physics_param[0] + physics_param[3];
+  c_R_tmp = -physics_param[0] * L_offset[0];
+  d_R_tmp = c_R_tmp * L_offset[1];
+  J[3] = d_R_tmp;
+  c_R_tmp *= L_offset[2];
+  J[6] = c_R_tmp;
+  J[1] = d_R_tmp;
+  d_R_tmp = L_offset[0] * L_offset[0];
+  J[4] = physics_param[4] + physics_param[0] * (d_R_tmp + R_tmp);
+  R_tmp = -physics_param[0] * L_offset[1] * L_offset[2];
+  J[7] = R_tmp;
+  J[2] = c_R_tmp;
+  J[5] = R_tmp;
+  J[8] = physics_param[5] + physics_param[0] * (d_R_tmp + b_R_tmp);
   //  skew
-  //  exact form with ddRbi from flatenss
-  //  errors
-  for (rtemp = 0; rtemp < 3; rtemp++) {
-    a21 = R[rtemp];
-    maxval = a21 * 0.0;
-    eR_raw_tmp_tmp[3 * rtemp] = a21;
-    a21 = R[rtemp + 3];
-    maxval += a21 * 0.0;
-    eR_raw_tmp_tmp[3 * rtemp + 1] = a21;
-    a21 = R[rtemp + 6];
-    maxval += a21 * Fl;
-    eR_raw_tmp_tmp[3 * rtemp + 2] = a21;
-    F[rtemp] = maxval;
-  }
-  ddxi_idx_0 = ((F[0] - load_acc[0] * physics_param[1]) + ddxi_flat[0]) /
-               physics_param[0];
-  ddxi_idx_1 = ((F[1] - physics_param[1] * load_acc[1]) + ddxi_flat[1]) /
-               physics_param[0];
-  R_tmp = physics_param[0] * physics_param[2];
-  ddxi_idx_2 = (((F[2] - (physics_param[1] * load_acc[2] -
-                          physics_param[1] * physics_param[2])) +
-                 ddxi_flat[2]) +
-                R_tmp) /
-               physics_param[0];
-  for (rtemp = 0; rtemp < 3; rtemp++) {
-    a21 = eR_raw_tmp_tmp[rtemp];
-    maxval = eR_raw_tmp_tmp[rtemp + 3];
-    b_R_tmp = eR_raw_tmp_tmp[rtemp + 6];
-    for (int i{0}; i < 3; i++) {
-      b_r1 = 3 * i + 1;
-      r2 = 3 * i + 2;
-      d = (a21 * Rd[3 * i] + maxval * Rd[b_r1]) + b_R_tmp * Rd[r2];
-      r3 = rtemp + 3 * i;
-      eR_raw_tmp[r3] = d;
-      eR_raw[r3] = ((Rd[3 * rtemp] * R[3 * i] + Rd[3 * rtemp + 1] * R[b_r1]) +
-                    Rd[3 * rtemp + 2] * R[r2]) -
-                   d;
+  SOmega_tmp[0] = 0.0;
+  SOmega_tmp[3] = -Omega[2];
+  SOmega_tmp[6] = Omega[1];
+  SOmega_tmp[1] = Omega[2];
+  SOmega_tmp[4] = 0.0;
+  SOmega_tmp[7] = -Omega[0];
+  SOmega_tmp[2] = -Omega[1];
+  SOmega_tmp[5] = Omega[0];
+  SOmega_tmp[8] = 0.0;
+  //  thrust force vector
+  y[0] = 0.0;
+  y[1] = 0.0;
+  y[2] = Fl;
+  //  approximated suspension point acc.
+  d = physics_param[0];
+  for (int i{0}; i < 3; i++) {
+    d1 = 0.0;
+    for (int i1{0}; i1 < 3; i1++) {
+      F_tmp = i + 3 * i1;
+      d1 += R[F_tmp] * y[i1];
+      eR_raw[F_tmp] = (d * R[i] * SOmega_tmp[3 * i1] +
+                       d * R[i + 3] * SOmega_tmp[3 * i1 + 1]) +
+                      d * R[i + 6] * SOmega_tmp[3 * i1 + 2];
+    }
+    F[i] = d1;
+    d1 = eR_raw[i];
+    d2 = eR_raw[i + 3];
+    d3 = eR_raw[i + 6];
+    for (int i1{0}; i1 < 3; i1++) {
+      b_physics_param[i + 3 * i1] =
+          (d1 * SOmega_tmp[3 * i1] + d2 * SOmega_tmp[3 * i1 + 1]) +
+          d3 * SOmega_tmp[3 * i1 + 2];
     }
   }
-  //  before vee map
-  //  inner loop control laws
+  //  errors
+  d = L_offset[0];
+  d1 = L_offset[1];
+  d2 = L_offset[2];
+  for (int i{0}; i < 3; i++) {
+    eR_raw_tmp_tmp[3 * i] = R[i];
+    eR_raw_tmp_tmp[3 * i + 1] = R[i + 3];
+    eR_raw_tmp_tmp[3 * i + 2] = R[i + 6];
+    y[i] = (b_physics_param[i] * d + b_physics_param[i + 3] * d1) +
+           b_physics_param[i + 6] * d2;
+  }
+  for (int i{0}; i < 3; i++) {
+    d = eR_raw_tmp_tmp[i];
+    d1 = eR_raw_tmp_tmp[i + 3];
+    d2 = eR_raw_tmp_tmp[i + 6];
+    for (int i1{0}; i1 < 3; i1++) {
+      int b_eR_raw_tmp_tmp;
+      int i2;
+      F_tmp = 3 * i1 + 1;
+      i2 = 3 * i1 + 2;
+      d3 = (d * Rd[3 * i1] + d1 * Rd[F_tmp]) + d2 * Rd[i2];
+      b_eR_raw_tmp_tmp = i + 3 * i1;
+      eR_raw_tmp[b_eR_raw_tmp_tmp] = d3;
+      eR_raw[b_eR_raw_tmp_tmp] =
+          ((Rd[3 * i] * R[3 * i1] + Rd[3 * i + 1] * R[F_tmp]) +
+           Rd[3 * i + 2] * R[i2]) -
+          d3;
+    }
+  }
   r = _mm_loadu_pd(&eR_raw[0]);
   r1 = _mm_set1_pd(0.5);
   _mm_storeu_pd(&eR_raw[0], _mm_mul_pd(r1, r));
-  r = _mm_loadu_pd(&eR_raw_tmp_tmp[0]);
-  b_r2 = _mm_set1_pd(physics_param[0]);
-  _mm_storeu_pd(&R[0], _mm_mul_pd(r, b_r2));
   r = _mm_loadu_pd(&eR_raw[2]);
   _mm_storeu_pd(&eR_raw[2], _mm_mul_pd(r1, r));
-  r = _mm_loadu_pd(&eR_raw_tmp_tmp[2]);
-  _mm_storeu_pd(&R[2], _mm_mul_pd(r, b_r2));
   r = _mm_loadu_pd(&eR_raw[4]);
   _mm_storeu_pd(&eR_raw[4], _mm_mul_pd(r1, r));
-  r = _mm_loadu_pd(&eR_raw_tmp_tmp[4]);
-  _mm_storeu_pd(&R[4], _mm_mul_pd(r, b_r2));
   r = _mm_loadu_pd(&eR_raw[6]);
   _mm_storeu_pd(&eR_raw[6], _mm_mul_pd(r1, r));
-  r = _mm_loadu_pd(&eR_raw_tmp_tmp[6]);
-  _mm_storeu_pd(&R[6], _mm_mul_pd(r, b_r2));
-  R[8] = physics_param[0] * eR_raw_tmp_tmp[8];
-  dv[2] = physics_param[2];
-  a21 = Omegad[0];
-  maxval = Omegad[1];
-  b_R_tmp = Omegad[2];
-  r = _mm_loadu_pd(&R[0]);
-  r1 = _mm_mul_pd(r, _mm_set1_pd(ddxi_idx_0));
-  r = _mm_mul_pd(r, _mm_set1_pd(0.0));
-  b_r2 = _mm_loadu_pd(&R[3]);
-  b_r3 = _mm_mul_pd(b_r2, _mm_set1_pd(ddxi_idx_1));
-  r1 = _mm_add_pd(r1, b_r3);
-  b_r2 = _mm_mul_pd(b_r2, _mm_set1_pd(0.0));
-  r = _mm_add_pd(r, b_r2);
-  b_r2 = _mm_loadu_pd(&R[6]);
-  b_r3 = _mm_mul_pd(b_r2, _mm_set1_pd(ddxi_idx_2));
-  r1 = _mm_add_pd(r1, b_r3);
-  b_r2 = _mm_mul_pd(b_r2, _mm_set1_pd(dv[2]));
-  r = _mm_add_pd(r, b_r2);
-  _mm_storeu_pd(&c_y[0], r);
-  _mm_storeu_pd(&b_y[0], r1);
-  r = _mm_loadu_pd(&J[0]);
-  r = _mm_mul_pd(r, _mm_set1_pd(Omega[0]));
-  r1 = _mm_loadu_pd(&J[3]);
-  r1 = _mm_mul_pd(r1, _mm_set1_pd(Omega[1]));
-  r = _mm_add_pd(r, r1);
-  r1 = _mm_loadu_pd(&J[6]);
-  r1 = _mm_mul_pd(r1, _mm_set1_pd(Omega[2]));
-  r = _mm_add_pd(r, r1);
-  _mm_storeu_pd(&y[0], r);
-  r = _mm_loadu_pd(&eR_raw_tmp[0]);
-  r = _mm_mul_pd(r, _mm_set1_pd(a21));
-  r1 = _mm_loadu_pd(&eR_raw_tmp[3]);
-  r1 = _mm_mul_pd(r1, _mm_set1_pd(maxval));
-  r = _mm_add_pd(r, r1);
-  r1 = _mm_loadu_pd(&eR_raw_tmp[6]);
-  r1 = _mm_mul_pd(r1, _mm_set1_pd(b_R_tmp));
-  r = _mm_add_pd(r, r1);
-  r1 = _mm_loadu_pd(&Omega[0]);
-  r = _mm_sub_pd(r1, r);
-  _mm_storeu_pd(&b_Omega[0], r);
-  d = R[2];
-  d1 = d * ddxi_idx_0;
-  d2 = d * 0.0;
-  d = R[5];
-  d1 += d * ddxi_idx_1;
-  d2 += d * 0.0;
-  d = R[8];
-  d1 += d * ddxi_idx_2;
-  d2 += d * dv[2];
-  c_y[2] = d2;
-  b_y[2] = d1;
-  y[2] = (Omega[0] * J[2] + Omega[1] * J[5]) + Omega[2] * J[8];
-  b_Omega[2] = Omega[2] - ((eR_raw_tmp[2] * a21 + eR_raw_tmp[5] * maxval) +
-                           eR_raw_tmp[8] * b_R_tmp);
-  b_gains[0] = -gains[0] * eR_raw[5];
-  b_gains[1] = -gains[0] * eR_raw[6];
-  b_gains[2] = -gains[0] * eR_raw[1];
-  c_Omega[0] = Omega[1] * y[2] - y[1] * Omega[2];
-  c_Omega[1] = y[0] * Omega[2] - Omega[0] * y[2];
-  c_Omega[2] = Omega[0] * y[1] - y[0] * Omega[1];
-  R[0] = 0.0;
-  R[3] = -Omega[2];
-  R[6] = Omega[1];
-  R[1] = Omega[2];
-  R[4] = 0.0;
-  R[7] = -Omega[0];
-  R[2] = -Omega[1];
-  R[5] = Omega[0];
-  R[8] = 0.0;
-  for (rtemp = 0; rtemp < 3; rtemp++) {
-    a21 = R[rtemp];
-    maxval = R[rtemp + 3];
-    b_R_tmp = R[rtemp + 6];
-    for (int i{0}; i < 3; i++) {
-      eR_raw[rtemp + 3 * i] =
-          (a21 * eR_raw_tmp_tmp[3 * i] + maxval * eR_raw_tmp_tmp[3 * i + 1]) +
-          b_R_tmp * eR_raw_tmp_tmp[3 * i + 2];
-    }
-    a21 = eR_raw[rtemp];
-    maxval = eR_raw[rtemp + 3];
-    b_R_tmp = eR_raw[rtemp + 6];
-    d = 0.0;
-    d1 = 0.0;
-    for (int i{0}; i < 3; i++) {
-      d2 = (a21 * Rd[3 * i] + maxval * Rd[3 * i + 1]) + b_R_tmp * Rd[3 * i + 2];
-      b_r1 = rtemp + 3 * i;
-      R[b_r1] = d2;
-      d += d2 * Omegad[i];
-      d1 += eR_raw_tmp[b_r1] * dOmegad[i];
-    }
-    dv[rtemp] = d - d1;
-  }
-  __m128d r4;
-  __m128d r5;
-  double d3;
-  double d4;
-  double d5;
-  y[0] = L_offset[1] * b_y[2] - b_y[1] * L_offset[2];
-  y[1] = b_y[0] * L_offset[2] - L_offset[0] * b_y[2];
-  y[2] = L_offset[0] * b_y[1] - b_y[0] * L_offset[1];
-  b_y[0] = L_offset[1] * c_y[2] - c_y[1] * L_offset[2];
-  b_y[1] = c_y[0] * L_offset[2] - L_offset[0] * c_y[2];
-  b_y[2] = L_offset[0] * c_y[1] - c_y[0] * L_offset[1];
-  a21 = dv[0];
-  maxval = dv[1];
-  b_R_tmp = dv[2];
+  //  before vee map
+  eR[0] = eR_raw[5];
+  eR[1] = eR_raw[6];
+  eR[2] = eR_raw[1];
+  //  inner loop control laws
+  b_F[0] = (F[0] - load_acc[0] * physics_param[1]) + y[0];
+  b_F[1] = (F[1] - physics_param[1] * load_acc[1]) + y[1];
+  b_F[2] = (F[2] - (physics_param[1] * load_acc[2] -
+                    physics_param[1] * physics_param[2])) +
+           y[2];
+  y[0] = 0.0;
+  y[1] = 0.0;
+  R_tmp = physics_param[0] * physics_param[2];
+  y[2] = R_tmp;
   d = Omegad[0];
   d1 = Omegad[1];
   d2 = Omegad[2];
-  r = _mm_loadu_pd(&b_Omega[0]);
-  r = _mm_mul_pd(_mm_set1_pd(gains[1]), r);
-  r1 = _mm_loadu_pd(&b_gains[0]);
+  r = _mm_loadu_pd(&eR_raw_tmp[0]);
+  r = _mm_mul_pd(r, _mm_set1_pd(d));
+  r1 = _mm_loadu_pd(&eR_raw_tmp[3]);
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(d1));
+  r = _mm_add_pd(r, r1);
+  r1 = _mm_loadu_pd(&eR_raw_tmp[6]);
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(d2));
+  r = _mm_add_pd(r, r1);
+  r1 = _mm_loadu_pd(&Omega[0]);
   r = _mm_sub_pd(r1, r);
-  r1 = _mm_loadu_pd(&c_Omega[0]);
+  _mm_storeu_pd(&eI_dt[0], r);
+  r = _mm_loadu_pd(&b_F[0]);
+  r1 = _mm_loadu_pd(&y[0]);
   r = _mm_add_pd(r, r1);
-  r1 = _mm_loadu_pd(&J[0]);
-  b_r2 = _mm_mul_pd(r1, _mm_set1_pd(a21));
-  b_r3 = _mm_loadu_pd(&J[3]);
-  r4 = _mm_mul_pd(b_r3, _mm_set1_pd(maxval));
-  b_r2 = _mm_add_pd(b_r2, r4);
-  r4 = _mm_loadu_pd(&J[6]);
-  r5 = _mm_mul_pd(r4, _mm_set1_pd(b_R_tmp));
-  b_r2 = _mm_add_pd(b_r2, r5);
-  r = _mm_sub_pd(r, b_r2);
-  b_r2 = _mm_loadu_pd(&y[0]);
-  r = _mm_sub_pd(r, b_r2);
-  b_r2 = _mm_loadu_pd(&b_y[0]);
-  r = _mm_add_pd(r, b_r2);
-  _mm_storeu_pd(&taub[0], r);
-  r = _mm_mul_pd(r1, _mm_set1_pd(d));
-  r1 = _mm_mul_pd(b_r3, _mm_set1_pd(d1));
-  r = _mm_add_pd(r, r1);
-  r1 = _mm_mul_pd(r4, _mm_set1_pd(d2));
-  r = _mm_add_pd(r, r1);
-  _mm_storeu_pd(&y[0], r);
-  d3 = J[2];
-  d4 = J[5];
-  d5 = J[8];
-  taub[2] = ((((b_gains[2] - gains[1] * b_Omega[2]) + c_Omega[2]) -
-              ((d3 * a21 + d4 * maxval) + d5 * b_R_tmp)) -
-             y[2]) +
-            b_y[2];
-  y[2] = (d3 * d + d4 * d1) + d5 * d2;
-  tau[0] = taub[0] + (L_offset[1] * Fl - L_offset[2] * 0.0);
-  tau[1] = taub[1] + (L_offset[2] * 0.0 - L_offset[0] * Fl);
-  tau[2] = taub[2] + (L_offset[0] * 0.0 - L_offset[1] * 0.0);
-  a21 = physics_param[0];
+  r = _mm_div_pd(r, _mm_set1_pd(physics_param[0]));
+  _mm_storeu_pd(&b_F[0], r);
+  eI_dt[2] = Omega[2] -
+             ((eR_raw_tmp[2] * d + eR_raw_tmp[5] * d1) + eR_raw_tmp[8] * d2);
+  b_F[2] = (b_F[2] + y[2]) / physics_param[0];
+  d = physics_param[0];
+  d1 = b_F[0];
+  d2 = b_F[1];
+  d3 = b_F[2];
   r = _mm_loadu_pd(&eR_raw_tmp_tmp[0]);
-  r1 = _mm_mul_pd(r, _mm_set1_pd(a21));
-  r1 = _mm_mul_pd(r1, _mm_set1_pd(ddxi_idx_0));
+  r = _mm_mul_pd(r, _mm_set1_pd(d));
+  r = _mm_mul_pd(r, _mm_set1_pd(d1));
+  r1 = _mm_loadu_pd(&eR_raw_tmp_tmp[3]);
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(d));
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(d2));
+  r = _mm_add_pd(r, r1);
+  r1 = _mm_loadu_pd(&eR_raw_tmp_tmp[6]);
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(d));
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(d3));
+  r = _mm_add_pd(r, r1);
+  _mm_storeu_pd(&b[0], r);
+  b[2] = (eR_raw_tmp_tmp[2] * d * d1 + eR_raw_tmp_tmp[5] * d * d2) +
+         eR_raw_tmp_tmp[8] * d * d3;
+  F[0] = L_offset[1] * b[2] - b[1] * L_offset[2];
+  F[1] = b[0] * L_offset[2] - L_offset[0] * b[2];
+  F[2] = L_offset[0] * b[1] - b[0] * L_offset[1];
+  r = _mm_loadu_pd(&eR_raw_tmp_tmp[0]);
   r = _mm_mul_pd(r, _mm_set1_pd(0.0));
-  b_r2 = _mm_loadu_pd(&eR_raw_tmp_tmp[3]);
-  b_r3 = _mm_mul_pd(b_r2, _mm_set1_pd(a21));
-  b_r3 = _mm_mul_pd(b_r3, _mm_set1_pd(ddxi_idx_1));
-  r1 = _mm_add_pd(r1, b_r3);
-  b_r2 = _mm_mul_pd(b_r2, _mm_set1_pd(0.0));
-  r = _mm_add_pd(r, b_r2);
-  b_r2 = _mm_loadu_pd(&eR_raw_tmp_tmp[6]);
-  b_r3 = _mm_mul_pd(b_r2, _mm_set1_pd(a21));
-  b_r3 = _mm_mul_pd(b_r3, _mm_set1_pd(ddxi_idx_2));
-  r1 = _mm_add_pd(r1, b_r3);
-  b_r2 = _mm_mul_pd(b_r2, _mm_set1_pd(R_tmp));
-  r = _mm_add_pd(r, b_r2);
-  _mm_storeu_pd(&c_y[0], r);
-  _mm_storeu_pd(&b_y[0], r1);
-  maxval = eR_raw_tmp_tmp[2];
-  b_R_tmp = maxval * a21 * ddxi_idx_0;
-  d = maxval * 0.0;
-  maxval = eR_raw_tmp_tmp[5];
-  b_R_tmp += maxval * a21 * ddxi_idx_1;
-  d += maxval * 0.0;
-  maxval = eR_raw_tmp_tmp[8];
-  b_R_tmp += maxval * a21 * ddxi_idx_2;
-  d += maxval * R_tmp;
-  c_y[2] = d;
-  b_y[2] = b_R_tmp;
-  F[0] = ((taub[0] - (Omegad[1] * y[2] - y[1] * Omegad[2])) +
-          (L_offset[1] * b_y[2] - b_y[1] * L_offset[2])) -
-         (L_offset[1] * c_y[2] - c_y[1] * L_offset[2]);
-  F[1] = ((taub[1] - (y[0] * Omegad[2] - Omegad[0] * y[2])) +
-          (b_y[0] * L_offset[2] - L_offset[0] * b_y[2])) -
-         (c_y[0] * L_offset[2] - L_offset[0] * c_y[2]);
-  F[2] = ((taub[2] - (Omegad[0] * y[1] - y[0] * Omegad[1])) +
-          (L_offset[0] * b_y[1] - b_y[0] * L_offset[1])) -
-         (L_offset[0] * c_y[1] - c_y[0] * L_offset[1]);
-  b_r1 = 0;
-  r2 = 1;
-  r3 = 2;
-  maxval = std::abs(J[0]);
-  a21 = std::abs(b_J_tmp);
-  if (a21 > maxval) {
-    maxval = a21;
-    b_r1 = 1;
-    r2 = 0;
+  r1 = _mm_loadu_pd(&eR_raw_tmp_tmp[3]);
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(0.0));
+  r = _mm_add_pd(r, r1);
+  r1 = _mm_loadu_pd(&eR_raw_tmp_tmp[6]);
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(R_tmp));
+  r = _mm_add_pd(r, r1);
+  _mm_storeu_pd(&b[0], r);
+  b[2] = (eR_raw_tmp_tmp[2] * 0.0 + eR_raw_tmp_tmp[5] * 0.0) +
+         eR_raw_tmp_tmp[8] * R_tmp;
+  b_y[0] = L_offset[1] * b[2] - b[1] * L_offset[2];
+  b_y[1] = b[0] * L_offset[2] - L_offset[0] * b[2];
+  b_y[2] = L_offset[0] * b[1] - b[0] * L_offset[1];
+  d = Omega[0];
+  d1 = Omega[1];
+  d2 = Omega[2];
+  r = _mm_loadu_pd(&J[0]);
+  r = _mm_mul_pd(r, _mm_set1_pd(d));
+  r1 = _mm_loadu_pd(&J[3]);
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(d1));
+  r = _mm_add_pd(r, r1);
+  r1 = _mm_loadu_pd(&J[6]);
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(d2));
+  r = _mm_add_pd(r, r1);
+  _mm_storeu_pd(&b[0], r);
+  b[2] = (J[2] * d + J[5] * d1) + J[8] * d2;
+  y[0] = physics_param[3];
+  y[1] = physics_param[4];
+  y[2] = physics_param[5];
+  coder::diag(y, R);
+  b_F[0] = Omega[1] * b[2] - b[1] * Omega[2];
+  b_F[1] = b[0] * Omega[2] - Omega[0] * b[2];
+  b_F[2] = Omega[0] * b[1] - b[0] * Omega[1];
+  for (int i{0}; i < 3; i++) {
+    d = SOmega_tmp[i];
+    d1 = SOmega_tmp[i + 3];
+    d2 = SOmega_tmp[i + 6];
+    for (int i1{0}; i1 < 3; i1++) {
+      b_physics_param[i + 3 * i1] =
+          (d * eR_raw_tmp_tmp[3 * i1] + d1 * eR_raw_tmp_tmp[3 * i1 + 1]) +
+          d2 * eR_raw_tmp_tmp[3 * i1 + 2];
+    }
+    d = b_physics_param[i];
+    d1 = b_physics_param[i + 3];
+    d2 = b_physics_param[i + 6];
+    d3 = 0.0;
+    R_tmp = 0.0;
+    for (int i1{0}; i1 < 3; i1++) {
+      b_R_tmp = (d * Rd[3 * i1] + d1 * Rd[3 * i1 + 1]) + d2 * Rd[3 * i1 + 2];
+      F_tmp = i + 3 * i1;
+      SOmega_tmp[F_tmp] = b_R_tmp;
+      d3 += b_R_tmp * Omegad[i1];
+      R_tmp += eR_raw_tmp[F_tmp] * dOmegad[i1];
+    }
+    b[i] = d3 - R_tmp;
   }
-  if (std::abs(J_tmp) > maxval) {
-    b_r1 = 2;
-    r2 = 1;
-    r3 = 0;
-  }
-  J[r2] /= J[b_r1];
-  J[r3] /= J[b_r1];
-  J[r2 + 3] -= J[r2] * J[b_r1 + 3];
-  J[r3 + 3] -= J[r3] * J[b_r1 + 3];
-  J[r2 + 6] -= J[r2] * J[b_r1 + 6];
-  J[r3 + 6] -= J[r3] * J[b_r1 + 6];
-  if (std::abs(J[r3 + 3]) > std::abs(J[r2 + 3])) {
-    rtemp = r2;
-    r2 = r3;
-    r3 = rtemp;
-  }
-  J[r3 + 3] /= J[r2 + 3];
-  J[r3 + 6] -= J[r3 + 3] * J[r2 + 6];
-  rate_sp[1] = F[r2] - F[b_r1] * J[r2];
-  rate_sp[2] = (F[r3] - F[b_r1] * J[r3]) - rate_sp[1] * J[r3 + 3];
-  rate_sp[2] /= J[r3 + 6];
-  rate_sp[0] = F[b_r1] - rate_sp[2] * J[b_r1 + 6];
-  rate_sp[1] -= rate_sp[2] * J[r2 + 6];
-  rate_sp[1] /= J[r2 + 3];
-  rate_sp[0] -= rate_sp[1] * J[b_r1 + 3];
-  rate_sp[0] /= J[b_r1];
+  __m128d r2;
+  __m128d r3;
+  __m128d r4;
+  double d4;
+  //  CoM torque
+  //  desired angular acceleration from dynamics
+  //  integral derivative
+  d = gains[0];
+  d1 = gains[1];
+  d2 = gains[2];
+  d3 = gains[3];
+  R_tmp = b[0];
+  b_R_tmp = b[1];
+  c_R_tmp = b[2];
+  d_R_tmp = Omegad[0];
+  e_R_tmp = Omegad[1];
+  f_R_tmp = Omegad[2];
+  r = _mm_loadu_pd(&eR[0]);
+  r1 = _mm_mul_pd(_mm_set1_pd(-d), r);
+  r2 = _mm_loadu_pd(&eI_dt[0]);
+  r3 = _mm_mul_pd(_mm_set1_pd(d1), r2);
+  r1 = _mm_sub_pd(r1, r3);
+  r3 = _mm_loadu_pd(&eI[0]);
+  r3 = _mm_mul_pd(_mm_set1_pd(d2), r3);
+  r1 = _mm_sub_pd(r1, r3);
+  r3 = _mm_loadu_pd(&b_F[0]);
+  r1 = _mm_add_pd(r1, r3);
+  r3 = _mm_loadu_pd(&R[0]);
+  r3 = _mm_mul_pd(r3, _mm_set1_pd(R_tmp));
+  r4 = _mm_loadu_pd(&R[3]);
+  r4 = _mm_mul_pd(r4, _mm_set1_pd(b_R_tmp));
+  r3 = _mm_add_pd(r3, r4);
+  r4 = _mm_loadu_pd(&R[6]);
+  r4 = _mm_mul_pd(r4, _mm_set1_pd(c_R_tmp));
+  r3 = _mm_add_pd(r3, r4);
+  r1 = _mm_sub_pd(r1, r3);
+  r3 = _mm_loadu_pd(&F[0]);
+  r1 = _mm_sub_pd(r1, r3);
+  r3 = _mm_loadu_pd(&b_y[0]);
+  r1 = _mm_add_pd(r1, r3);
+  _mm_storeu_pd(&taub[0], r1);
+  r1 = _mm_loadu_pd(&J[0]);
+  r1 = _mm_mul_pd(r1, _mm_set1_pd(d_R_tmp));
+  r3 = _mm_loadu_pd(&J[3]);
+  r3 = _mm_mul_pd(r3, _mm_set1_pd(e_R_tmp));
+  r1 = _mm_add_pd(r1, r3);
+  r3 = _mm_loadu_pd(&J[6]);
+  r3 = _mm_mul_pd(r3, _mm_set1_pd(f_R_tmp));
+  r1 = _mm_add_pd(r1, r3);
+  _mm_storeu_pd(&b[0], r1);
+  r = _mm_mul_pd(_mm_set1_pd(d3), r);
+  r = _mm_add_pd(r2, r);
+  _mm_storeu_pd(&eI_dt[0], r);
+  g_R_tmp = eR[2];
+  d4 = eI_dt[2];
+  taub[2] = (((((-d * g_R_tmp - d1 * d4) - d2 * eI[2]) + b_F[2]) -
+              ((R[2] * R_tmp + R[5] * b_R_tmp) + R[8] * c_R_tmp)) -
+             F[2]) +
+            b_y[2];
+  b[2] = (J[2] * d_R_tmp + J[5] * e_R_tmp) + J[8] * f_R_tmp;
+  d4 += d3 * g_R_tmp;
+  eI_dt[2] = d4;
+  tau[0] = taub[0] + (L_offset[1] * Fl - 0.0 * L_offset[2]);
+  tau[1] = taub[1] + (0.0 * L_offset[2] - L_offset[0] * Fl);
+  tau[2] = taub[2] + (L_offset[0] * 0.0 - 0.0 * L_offset[1]);
+  y[0] = ((taub[0] - (Omegad[1] * b[2] - b[1] * Omegad[2])) + F[0]) - b_y[0];
+  y[1] = ((taub[1] - (b[0] * Omegad[2] - Omegad[0] * b[2])) + F[1]) - b_y[1];
+  y[2] = ((taub[2] - (Omegad[0] * b[1] - b[0] * Omegad[1])) + F[2]) - b_y[2];
+  coder::mldivide(J, y, rate_sp_dt);
 }
 
-// End of code generation (Inner_loop.cpp)
+//
+// File trailer for Inner_loop.cpp
+//
+// [EOF]
+//

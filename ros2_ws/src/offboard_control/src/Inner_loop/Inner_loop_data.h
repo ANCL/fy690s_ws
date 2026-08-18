@@ -2,19 +2,23 @@
 // Academic License - for use in teaching, academic research, and meeting
 // course requirements at degree granting institutions only.  Not for
 // government, commercial, or other organizational use.
+// File: Inner_loop_data.h
 //
-// Inner_loop_data.h
-//
-// Code generation for function 'Inner_loop_data'
+// MATLAB Coder version            : 24.2
+// C/C++ source code generated on  : 17-Aug-2026 21:58:17
 //
 
 #ifndef INNER_LOOP_DATA_H
 #define INNER_LOOP_DATA_H
 
-// Include files
+// Include Files
 #include "rtwtypes.h"
 #include <cstddef>
 #include <cstdlib>
 
 #endif
-// End of code generation (Inner_loop_data.h)
+//
+// File trailer for Inner_loop_data.h
+//
+// [EOF]
+//

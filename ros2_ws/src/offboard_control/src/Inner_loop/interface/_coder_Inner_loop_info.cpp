@@ -2,13 +2,13 @@
 // Academic License - for use in teaching, academic research, and meeting
 // course requirements at degree granting institutions only.  Not for
 // government, commercial, or other organizational use.
+// File: _coder_Inner_loop_info.cpp
 //
-// _coder_Inner_loop_info.cpp
-//
-// Code generation for function 'Inner_loop'
+// MATLAB Coder version            : 24.2
+// C/C++ source code generated on  : 17-Aug-2026 21:58:17
 //
 
-// Include files
+// Include Files
 #include "_coder_Inner_loop_info.h"
 #include "emlrt.h"
 #include "tmwtypes.h"
@@ -17,6 +17,10 @@
 static const mxArray *emlrtMexFcnResolvedFunctionsInfo();
 
 // Function Definitions
+//
+// Arguments    : void
+// Return Type  : const mxArray *
+//
 static const mxArray *emlrtMexFcnResolvedFunctionsInfo()
 {
   static const int32_T iv[2]{0, 1};
@@ -28,6 +32,10 @@ static const mxArray *emlrtMexFcnResolvedFunctionsInfo()
   return nameCaptureInfo;
 }
 
+//
+// Arguments    : void
+// Return Type  : mxArray *
+//
 mxArray *emlrtMexFcnProperties()
 {
   mxArray *xEntryPoints;
@@ -43,30 +51,31 @@ mxArray *emlrtMexFcnProperties()
                                  "UUID",
                                  "ClassEntryPointIsHandle"};
   const char_T *epFieldName[8]{
-      "Name",     "NumberOfInputs", "NumberOfOutputs", "ConstantInputs",
-      "FullPath", "TimeStamp",      "Constructor",     "Visible"};
+      "QualifiedName",    "NumberOfInputs", "NumberOfOutputs", "ConstantInputs",
+      "ResolvedFilePath", "TimeStamp",      "Constructor",     "Visible"};
   xEntryPoints =
       emlrtCreateStructMatrix(1, 1, 8, (const char_T **)&epFieldName[0]);
   xInputs = emlrtCreateLogicalMatrix(1, 11);
-  emlrtSetField(xEntryPoints, 0, "Name", emlrtMxCreateString("Inner_loop"));
+  emlrtSetField(xEntryPoints, 0, "QualifiedName",
+                emlrtMxCreateString("Inner_loop"));
   emlrtSetField(xEntryPoints, 0, "NumberOfInputs",
                 emlrtMxCreateDoubleScalar(11.0));
   emlrtSetField(xEntryPoints, 0, "NumberOfOutputs",
-                emlrtMxCreateDoubleScalar(3.0));
+                emlrtMxCreateDoubleScalar(4.0));
   emlrtSetField(xEntryPoints, 0, "ConstantInputs", xInputs);
   emlrtSetField(
-      xEntryPoints, 0, "FullPath",
-      emlrtMxCreateString(
-          "Z:\\ros2\\QCSP_offset - ROS2\\ode89\\inner_v2\\Inner_loop.m"));
+      xEntryPoints, 0, "ResolvedFilePath",
+      emlrtMxCreateString("\\\\silver\\home\\yongqingl\\ros2\\QCSP_offset - "
+                          "ROS2\\ode89\\Inner_v3\\Inner_loop.m"));
   emlrtSetField(xEntryPoints, 0, "TimeStamp",
-                emlrtMxCreateDoubleScalar(740001.555775463));
+                emlrtMxCreateDoubleScalar(740211.9153240741));
   emlrtSetField(xEntryPoints, 0, "Constructor",
                 emlrtMxCreateLogicalScalar(false));
   emlrtSetField(xEntryPoints, 0, "Visible", emlrtMxCreateLogicalScalar(true));
   xResult =
       emlrtCreateStructMatrix(1, 1, 9, (const char_T **)&propFieldName[0]);
   emlrtSetField(xResult, 0, "Version",
-                emlrtMxCreateString("24.1.0.2603908 (R2024a) Update 3"));
+                emlrtMxCreateString("24.2.0.2923080 (R2024b) Update 6"));
   emlrtSetField(xResult, 0, "ResolvedFunctions",
                 (mxArray *)emlrtMexFcnResolvedFunctionsInfo());
   emlrtSetField(xResult, 0, "Checksum",
@@ -75,4 +84,8 @@ mxArray *emlrtMexFcnProperties()
   return xResult;
 }
 
-// End of code generation (_coder_Inner_loop_info.cpp)
+//
+// File trailer for _coder_Inner_loop_info.cpp
+//
+// [EOF]
+//

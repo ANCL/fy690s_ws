@@ -2,18 +2,26 @@
 // Academic License - for use in teaching, academic research, and meeting
 // course requirements at degree granting institutions only.  Not for
 // government, commercial, or other organizational use.
+// File: Inner_loop_initialize.cpp
 //
-// Inner_loop_initialize.cpp
-//
-// Code generation for function 'Inner_loop_initialize'
+// MATLAB Coder version            : 24.2
+// C/C++ source code generated on  : 17-Aug-2026 21:58:17
 //
 
-// Include files
+// Include Files
 #include "Inner_loop_initialize.h"
 
 // Function Definitions
+//
+// Arguments    : void
+// Return Type  : void
+//
 void Inner_loop_initialize()
 {
 }
 
-// End of code generation (Inner_loop_initialize.cpp)
+//
+// File trailer for Inner_loop_initialize.cpp
+//
+// [EOF]
+//

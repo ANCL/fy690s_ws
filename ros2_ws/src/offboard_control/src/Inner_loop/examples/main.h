@@ -2,10 +2,10 @@
 // Academic License - for use in teaching, academic research, and meeting
 // course requirements at degree granting institutions only.  Not for
 // government, commercial, or other organizational use.
+// File: main.h
 //
-// main.h
-//
-// Code generation for function 'main'
+// MATLAB Coder version            : 24.2
+// C/C++ source code generated on  : 17-Aug-2026 21:58:17
 //
 
 /*************************************************************************/
@@ -36,7 +36,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-// Include files
+// Include Files
 #include "rtwtypes.h"
 #include <cstddef>
 #include <cstdlib>
@@ -47,4 +47,8 @@ extern int main(int argc, char **argv);
 extern void main_Inner_loop();
 
 #endif
-// End of code generation (main.h)
+//
+// File trailer for main.h
+//
+// [EOF]
+//

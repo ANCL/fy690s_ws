@@ -1,3 +1,5 @@
 ﻿Inner_loop_initialize.obj
 Inner_loop_terminate.obj
 Inner_loop.obj
+diag.obj
+mldivide.obj

@@ -2,16 +2,16 @@
 // Academic License - for use in teaching, academic research, and meeting
 // course requirements at degree granting institutions only.  Not for
 // government, commercial, or other organizational use.
+// File: Inner_loop_terminate.h
 //
-// Inner_loop_terminate.h
-//
-// Code generation for function 'Inner_loop_terminate'
+// MATLAB Coder version            : 24.2
+// C/C++ source code generated on  : 17-Aug-2026 21:58:17
 //
 
 #ifndef INNER_LOOP_TERMINATE_H
 #define INNER_LOOP_TERMINATE_H
 
-// Include files
+// Include Files
 #include "rtwtypes.h"
 #include <cstddef>
 #include <cstdlib>
@@ -20,4 +20,8 @@
 extern void Inner_loop_terminate();
 
 #endif
-// End of code generation (Inner_loop_terminate.h)
+//
+// File trailer for Inner_loop_terminate.h
+//
+// [EOF]
+//
