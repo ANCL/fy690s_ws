@@ -61,7 +61,7 @@ class OffboardControl : public rclcpp::Node {
         norm_thrust_offset_ = this->declare_parameter<double>("norm_thrust_offset_", 0.14344); // 0.4
         ref_rate_limit_ = this->declare_parameter<double>("ref_rate_limit_", 1);
         att_control_type_ = this->declare_parameter<std::string>("att_control_type_", "QSF_offset");
-
+        
         // QSF gains
         sls_offset_params_.Kx_int = this->declare_parameter<double>("Kx_int", 10.0000);
         sls_offset_params_.Kx_pos = this->declare_parameter<double>("Kx_pos", 44.3906);
@@ -101,6 +101,13 @@ class OffboardControl : public rclcpp::Node {
         // double Iqxx = 0.02091; // experiment values
         // double Iqyy = 0.02091;
         // double Iqzz = 0.02934;
+        
+        // SLS cable parameters
+        sls_offset_params_.l = this->declare_parameter<double>("cable_length", 0.75);
+        sls_offset_params_.mass_load = this->declare_parameter<double>("load_mass", 0.300);
+        sls_offset_params_.L_offset[0] = this->declare_parameter<double>("L_offset_x", 0.0);
+        sls_offset_params_.L_offset[1] = this->declare_parameter<double>("L_offset_y", 0.0);
+        sls_offset_params_.L_offset[2] = this->declare_parameter<double>("L_offset_z", 0.0);
 
         // SLS offset Max torque
         sls_offset_params_.tau_x_max_ = this->declare_parameter<double>("tau_x_max_", 4.15*2.21356);
@@ -160,6 +167,7 @@ class OffboardControl : public rclcpp::Node {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode engaged.");
                     start_time_ = this->now();
                     reset_integral_ = true; // Reset integral when entering offboard mode
+                    RCLCPP_INFO(this->get_logger(), "Resetting integral state for QSF offset controller.");
                 } else if (!is_offboard_ && was_offboard) {
                     RCLCPP_INFO(this->get_logger(), "Offboard mode disengaged.");
                 }
@@ -169,6 +177,7 @@ class OffboardControl : public rclcpp::Node {
         vehicle_odometry_subscriber_ =
             this->create_subscription<px4_msgs::msg::VehicleOdometry>("/fmu/out/vehicle_odometry", rclcpp::SensorDataQoS(), [this](const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
                 if (!use_ekf_) return; // ignore if relying on external vision
+
                 if (std::isnan(msg->q[0]) || std::isnan(msg->velocity[0])) {
                     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "VehicleOdometry contains NaN. EKF not ready.");
                     return;
@@ -483,6 +492,17 @@ rcl_interfaces::msg::SetParametersResult OffboardControl::parameters_callback(co
             sls_offset_params_.tau_y_max_ = param.as_double();
         else if (param.get_name() == "tau_z_max_")
             sls_offset_params_.tau_z_max_ = param.as_double();
+
+        else if (param.get_name() == "cable_length")
+            sls_offset_params_.l = param.as_double();
+        else if (param.get_name() == "load_mass")
+            sls_offset_params_.load_mass_ = param.as_double();
+        else if (param.get_name() == "L_offset_x")
+            sls_offset_params_.L_offset_[0] = param.as_double();
+        else if (param.get_name() == "L_offset_y")
+            sls_offset_params_.L_offset_[1] = param.as_double();
+        else if (param.get_name() == "L_offset_z")
+            sls_offset_params_.L_offset_[2] = param.as_double();
     }
     return result;
 }
@@ -676,7 +696,7 @@ void OffboardControl::publish_se3_attitude_setpoint() {
 
     Eigen::Matrix3d R_d;
     R_d.col(0) = x_B;
-    R_d.col(1) = y_B;
+    R_d.col(1) = y_B;.
     R_d.col(2) = z_B;
 
     // convert to quaternion
@@ -978,7 +998,7 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
     double physics_parameters[6] = {mass_, sls_offset_params_.load_mass_, gravity_, sls_offset_params_.Iqxx, sls_offset_params_.Iqyy, sls_offset_params_.Iqzz};
     double load_acc[3] = {sls_offset_params_.ddxp, sls_offset_params_.ddyp, sls_offset_params_.ddzp};
     double taub[3], tau[3], rate_sp_dt[3]; 
-    
+
     // integral paramaters
     static double eI[3] = {0.0, 0.0, 0.0}; // integral state input
     static double eI_dt[3] = {0.0, 0.0, 0.0}; // derivative of integral state input
@@ -1002,7 +1022,7 @@ Eigen::Vector3d OffboardControl::sls_offset_thrust_torque_inner_loop(double thru
                sls_offset_params_.L_offset_, load_acc, eI, taub, tau,
                rate_sp_dt, eI_dt);
     
-    // reset integral if not in offboard mode or attitude not received
+    // reset integral if not in offboard mode
     if (reset_integral_) {
         for (int i = 0; i < 3; i++) {
             eI[i] = 0.0;
@@ -1038,18 +1058,18 @@ std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d, E
     // fig8
     double t = this->get_clock()->now().seconds() - mission_enabled_time_.seconds();
     double T = 42.0; // T = 42.0 -> 0.1496 & 0.2292 hz
-    double A = 1.5;
-    double B = 1.0;
+    double A = 0.0; //1.5;
+    double B = 0.0; //1.0;
     // xpd = A * sin(2 * M_PI * t / T);
     // ypd = B * sin(4 * M_PI * t / T);
     // zpd = -1.0;
-    double Od[3], dOd[3], ddRL[3];
+    double Od[3]{}, dOd[3]{}, ddRL[3]{}; // set all to zero for now
     double xipd[3], dxipd[3], d2xipd[3], d3xipd[3], d4xipd[3];
     // diff_flatness_fig8_QSF(t, mp, mq, l, g, psi_rad_, L_offset_,
-    //                         T, A, B, Od, dOd, dxipd,
-    //                         d2xipd, d3xipd, d4xipd, ddRL);
-    diff_flatness_mission_QSF(t, sls_offset_params_.load_mass_, mass_, sls_offset_params_.l, gravity_, sls_offset_params_.psi_rad_, sls_offset_params_.L_offset_, T, A, B, Od, dOd, xipd, dxipd, d2xipd,
-                              d3xipd, d4xipd, ddRL, &sls_offset_params_.Td_scaler);
+    //                          T, A, B, Od, dOd, dxipd,
+    //                          d2xipd, d3xipd, d4xipd, ddRL);
+    // diff_flatness_mission_QSF(t, sls_offset_params_.load_mass_, mass_, sls_offset_params_.l, gravity_, sls_offset_params_.psi_rad_, sls_offset_params_.L_offset_, T, A, B, Od, dOd, xipd, dxipd, d2xipd,
+    //                            d3xipd, d4xipd, ddRL, &sls_offset_params_.Td_scaler);
 
     // Store outputs
     sls_offset_params_.Omegad1 = Od[0];
