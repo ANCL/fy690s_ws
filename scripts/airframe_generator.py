@@ -39,7 +39,7 @@ def generate_airframe_files_and_solvers(alphas_deg, betas_deg, gammas_deg, repo_
     km_vals = [-0.0185, 0.0185, -0.0185, 0.0185, -0.0185, 0.0185]
     x_offset = 0.00 # constant rotor offset reletive to CoM FORWARD in body frame
     y_offset = 0.00 # constant rotor offset reletive to CoM LEFT in body frame
-    z_offset = -0.023 # z-offset of the of the center arm reletive to the CoM
+    z_offset = 0.00 # z-offset of the of the center arm reletive to the CoM
     motor_height = 0.0405 # height of motor
     ct_vals = [17.658, 17.658, 17.658, 17.658, 17.658, 17.658]
     directions = ["CW", "CCW", "CW", "CCW", "CW", "CCW"]
