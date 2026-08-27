@@ -202,7 +202,7 @@ public:
 
     pub_odom_drone_ = create_publisher<Odometry>(odom_drone_topic_, rclcpp::SensorDataQoS());
     pub_odom_load_ = create_publisher<Odometry>(odom_load_topic_, rclcpp::SensorDataQoS());
-    pub_px4_ev_ = create_publisher<VehicleOdometry>(px4_ev_topic_, rclcpp::SensorDataQoS());
+    pub_px4_ev_ = create_publisher<VehicleOdometry>(px4_ev_topic_, 10);
 
     RCLCPP_INFO(get_logger(), "Vicon Odometry Bridge Started.");
     RCLCPP_INFO(get_logger(), "Drone Odom: %s -> %s", vicon_drone_topic_.c_str(), odom_drone_topic_.c_str());
